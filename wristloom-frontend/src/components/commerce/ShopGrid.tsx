@@ -23,6 +23,7 @@ interface Filters {
 // ─── Shop Grid ────────────────────────────────────────────────
 export function ShopGrid() {
   const { isInWishlist, toggleItem } = useWishlistStore();
+  const [products, setProducts] = React.useState<any[]>(MOCK_PRODUCTS);
   const [filters, setFilters] = React.useState<Filters>({
     brands: [],
     movements: [],
@@ -31,15 +32,47 @@ export function ShopGrid() {
   });
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
+  React.useEffect(() => {
+    fetch('/api/products')
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        if (d?.products && d.products.length > 0) {
+          const mapped = d.products.map((p: any) => ({
+            id: p.id,
+            slug: p.slug,
+            name: p.name,
+            brand: p.brand,
+            reference_number: p.referenceNumber,
+            price: p.price,
+            currency: p.currency,
+            images: p.images?.length > 0 ? p.images : ['https://images.unsplash.com/photo-1524805444758-089113d48a6d?w=800&q=90'],
+            description: p.description,
+            movement_type: p.movementType || 'Automatic',
+            movement_caliber: p.movementCaliber || '',
+            power_reserve: p.powerReserve || '',
+            case_material: p.caseMaterial || 'Stainless Steel',
+            case_size: p.caseSize || '41mm',
+            dial_color: p.dialColor || 'Black',
+            condition: p.condition || 'New',
+            in_stock: p.inStock,
+            collection: p.collection || '',
+            tags: p.tags || [],
+          }));
+          setProducts(mapped);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const filtered = React.useMemo(() => {
-    return MOCK_PRODUCTS.filter((p) => {
+    return products.filter((p) => {
       if (filters.brands.length > 0 && !filters.brands.includes(p.brand)) return false;
       if (filters.movements.length > 0 && !filters.movements.includes(p.movement_type as MovementFilter)) return false;
       if (filters.conditions.length > 0 && !filters.conditions.includes(p.condition as ConditionFilter)) return false;
       if (p.price > filters.maxPrice) return false;
       return true;
     });
-  }, [filters]);
+  }, [filters, products]);
 
   const activeFilterCount =
     filters.brands.length + filters.movements.length + filters.conditions.length;

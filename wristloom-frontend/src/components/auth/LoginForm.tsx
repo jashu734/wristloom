@@ -46,6 +46,28 @@ export function LoginForm() {
       return;
     }
 
+    try {
+      const sessionRes = await fetch('/api/auth/session');
+      if (sessionRes.ok) {
+        const sessionData = await sessionRes.json();
+        const userRole = sessionData?.user?.role;
+        const isDefaultCallback = !searchParams.get('callbackUrl') || callbackUrl === '/account';
+        if (isDefaultCallback) {
+          if (userRole === 'ADMIN') {
+            router.push('/admin');
+            router.refresh();
+            return;
+          } else if (userRole === 'TECHNICIAN') {
+            router.push('/technician');
+            router.refresh();
+            return;
+          }
+        }
+      }
+    } catch {
+      // fallback to callbackUrl
+    }
+
     router.push(callbackUrl);
     router.refresh();
   }

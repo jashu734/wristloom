@@ -287,46 +287,164 @@ function VaultTab() {
 
 // ─── Orders Tab ───────────────────────────────────────────────
 function OrdersTab() {
-  const orders = [
-    { id: 'ORD-001', type: 'Purchase', item: 'Omega Speedmaster Professional', date: '2024-10-28', status: 'Delivered', amount: 540000 },
-    { id: 'SVC-001', type: 'Service', item: 'Full Service & Overhaul — Rolex Submariner', date: '2024-11-15', status: 'Completed', amount: 22000 },
-    { id: 'AUTH-001', type: 'Authentication', item: 'Audemars Piguet Royal Oak', date: '2024-09-12', status: 'Certificate Issued', amount: 8500 },
-    { id: 'WS-001', type: 'Workshop', item: 'Beginner Assembly Workshop', date: '2024-08-03', status: 'Attended', amount: 28000 },
-  ];
+  const [orders, setOrders] = React.useState<any[]>([]);
+  const [bookings, setBookings] = React.useState<any[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    async function loadData() {
+      try {
+        const [ordersRes, bookingsRes] = await Promise.all([
+          fetch('/api/orders').then((r) => r.ok ? r.json() : { orders: [] }),
+          fetch('/api/bookings').then((r) => r.ok ? r.json() : []),
+        ]);
+        setOrders(ordersRes.orders ?? []);
+        setBookings(Array.isArray(bookingsRes) ? bookingsRes : []);
+      } catch (e) {
+        console.error('Failed to load history', e);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
   const statusColor: Record<string, string> = {
-    'Delivered': 'text-emerald-400',
-    'Completed': 'text-emerald-400',
-    'Certificate Issued': 'text-sky-400',
-    'Attended': 'text-[#B08D57]',
+    DELIVERED: 'text-emerald-400',
+    COMPLETED: 'text-emerald-400',
+    CONFIRMED: 'text-[#B08D57]',
+    PROCESSING: 'text-amber-400',
+    SHIPPED: 'text-sky-400',
+    PENDING: 'text-amber-400',
+    TECHNICIAN_ASSIGNED: 'text-sky-400',
+    TECHNICIAN_EN_ROUTE: 'text-amber-400 font-bold',
+    IN_PROGRESS: 'text-indigo-400',
+    CANCELLED: 'text-red-400',
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-6 h-6 text-[#B08D57] animate-spin" />
+      </div>
+    );
+  }
+
+  const hasItems = orders.length > 0 || bookings.length > 0;
+
   return (
-    <div>
-      <h2 className="font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.35)] mb-5">
-        Order & Service History
-      </h2>
-      <div className="space-y-3">
-        {orders.map((order) => (
-          <div key={order.id} className="flex items-center gap-4 bg-[#1E1A17] border border-[rgba(176,141,87,0.08)] rounded-[2px] px-5 py-4">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <Badge variant="neutral">{order.type}</Badge>
-                <span className="font-mono text-[9px] text-[rgba(237,230,214,0.30)] uppercase tracking-wider">{order.id}</span>
-              </div>
-              <p className="text-sm text-[#EDE6D6] truncate">{order.item}</p>
-              <p className="font-mono text-[10px] text-[rgba(237,230,214,0.35)] mt-0.5">
-                {new Date(order.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-              </p>
-            </div>
-            <div className="text-right flex-shrink-0">
-              <p className="font-mono text-sm text-[rgba(237,230,214,0.70)]">{formatCurrency(order.amount)}</p>
-              <p className={`font-mono text-[10px] uppercase tracking-wider mt-0.5 ${statusColor[order.status] ?? 'text-[rgba(237,230,214,0.45)]'}`}>
-                {order.status}
-              </p>
-            </div>
+    <div className="space-y-8">
+      {/* Product Orders */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.35)]">
+            Watch Acquisitions ({orders.length})
+          </h2>
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/shop">Browse Atelier <ChevronRight className="w-3.5 h-3.5" /></Link>
+          </Button>
+        </div>
+
+        {orders.length === 0 ? (
+          <div className="bg-[#1E1A17] border border-[rgba(176,141,87,0.08)] rounded-[2px] p-6 text-center">
+            <Package className="w-8 h-8 text-[rgba(176,141,87,0.30)] mx-auto mb-2" />
+            <p className="text-sm text-[rgba(237,230,214,0.50)]">No timepiece acquisitions recorded yet.</p>
           </div>
-        ))}
+        ) : (
+          <div className="space-y-3">
+            {orders.map((order) => (
+              <div key={order.id} className="bg-[#1E1A17] border border-[rgba(176,141,87,0.08)] rounded-[2px] p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="neutral">Purchase</Badge>
+                    <span className="font-mono text-[10px] text-[#B08D57] font-semibold">{order.orderReference}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`font-mono text-[10px] uppercase tracking-wider ${statusColor[order.status] ?? 'text-[rgba(237,230,214,0.45)]'}`}>
+                      {order.status}
+                    </span>
+                    <span className="font-mono text-sm text-[#EDE6D6] font-semibold">{formatCurrency(order.totalAmount)}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 border-t border-[rgba(176,141,87,0.05)] pt-3">
+                  {order.orderItems?.map((item: any) => (
+                    <div key={item.id} className="flex items-center justify-between text-xs text-[rgba(237,230,214,0.70)]">
+                      <span>{item.brand} — {item.name} (x{item.quantity})</span>
+                      <span className="font-mono">{formatCurrency(item.price * item.quantity)}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between mt-3 pt-2 text-[10px] text-[rgba(237,230,214,0.35)] font-mono">
+                  <span>Ordered on {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                  <span>Payment: {order.paymentMethod}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Service Bookings */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.35)]">
+            Service & Restoration Bookings ({bookings.length})
+          </h2>
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/services/repair">Book Service <ChevronRight className="w-3.5 h-3.5" /></Link>
+          </Button>
+        </div>
+
+        {bookings.length === 0 ? (
+          <div className="bg-[#1E1A17] border border-[rgba(176,141,87,0.08)] rounded-[2px] p-6 text-center">
+            <Wrench className="w-8 h-8 text-[rgba(176,141,87,0.30)] mx-auto mb-2" />
+            <p className="text-sm text-[rgba(237,230,214,0.50)]">No watch repair or maintenance bookings yet.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {bookings.map((booking) => (
+              <div key={booking.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#1E1A17] border border-[rgba(176,141,87,0.08)] rounded-[2px] p-5">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge variant="brass">Service</Badge>
+                    <span className="font-mono text-[9px] text-[rgba(237,230,214,0.40)] uppercase">{booking.bookingReference}</span>
+                    <span className={`font-mono text-[10px] uppercase font-medium ${statusColor[booking.status] ?? 'text-[rgba(237,230,214,0.50)]'}`}>
+                      {booking.status.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                  <p className="text-sm text-[#EDE6D6] font-medium">{booking.serviceType}</p>
+                  <p className="text-xs text-[rgba(237,230,214,0.50)] mt-0.5">
+                    {booking.watchBrand ? `${booking.watchBrand} ${booking.watchModel || ''}` : 'Timepiece'} · Scheduled for {new Date(booking.scheduledDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ({booking.scheduledTimeStart} - {booking.scheduledTimeEnd})
+                  </p>
+                  {booking.technician?.user && (
+                    <p className="text-xs text-[#B08D57] mt-1">
+                      Assigned Master Horologist: {booking.technician.user.name}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {booking.status === 'TECHNICIAN_EN_ROUTE' && (
+                    <Button variant="primary" size="sm" asChild>
+                      <Link href={`/service-tracking?id=${booking.id}`}>
+                        Track Live Radar
+                      </Link>
+                    </Button>
+                  )}
+                  {booking.status !== 'TECHNICIAN_EN_ROUTE' && booking.status !== 'CANCELLED' && (
+                    <Button variant="subtle" size="sm" asChild>
+                      <Link href={`/service-tracking?id=${booking.id}`}>
+                        View Status
+                      </Link>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

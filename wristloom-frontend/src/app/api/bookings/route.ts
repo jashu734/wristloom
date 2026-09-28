@@ -29,10 +29,31 @@ export async function GET() {
       return NextResponse.json([]);
     }
 
+    const isAdmin = session.user.role === 'ADMIN';
+    const isTech = session.user.role === 'TECHNICIAN';
+
+    let where: any = {};
+    if (isAdmin) {
+      where = {};
+    } else if (isTech) {
+      const tech = await db.technician.findUnique({
+        where: { userId: session.user.id },
+        select: { id: true },
+      });
+      if (tech) {
+        where = { technicianId: tech.id };
+      } else {
+        where = { technician: { userId: session.user.id } };
+      }
+    } else {
+      where = { customerId: session.user.id };
+    }
+
     const bookings = await db.repairBooking.findMany({
-      where: { customerId: session.user.id },
+      where,
       include: {
         address: true,
+        customer: { select: { id: true, name: true, phone: true, email: true, profileImage: true } },
         technician: {
           include: {
             user: {
@@ -41,7 +62,7 @@ export async function GET() {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { scheduledDate: 'desc' },
     });
 
     return NextResponse.json(bookings);

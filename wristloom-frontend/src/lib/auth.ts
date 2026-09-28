@@ -132,11 +132,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
-        token.role = user.role ?? 'CUSTOMER';
-        token.phone = user.phone ?? null;
+        token.role = (user as any).role ?? 'CUSTOMER';
+        token.phone = (user as any).phone ?? null;
         if (user.image) token.picture = user.image;
         if (user.name) token.name = user.name;
         if (user.email) token.email = user.email;
+      }
+      if (!token.role || token.role === 'CUSTOMER') {
+        if (token.email) {
+          try {
+            const dbUser = await db.user.findUnique({
+              where: { email: token.email },
+              select: { id: true, role: true, phone: true, profileImage: true },
+            });
+            if (dbUser) {
+              token.id = dbUser.id;
+              token.role = dbUser.role;
+              if (dbUser.phone) token.phone = dbUser.phone;
+              if (dbUser.profileImage && !token.picture) token.picture = dbUser.profileImage;
+            }
+          } catch (e) {
+            console.error('[auth] Error fetching user role in jwt callback:', e);
+          }
+        }
       }
       if (!token.role) {
         token.role = 'CUSTOMER';

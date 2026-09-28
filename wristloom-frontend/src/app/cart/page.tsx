@@ -44,14 +44,51 @@ export default function CartPage() {
   React.useEffect(() => setMounted(true), []);
   if (!mounted) return null;
 
-  const handlePlaceOrder = (e: React.FormEvent) => {
+  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
+
+  const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setErrorMsg(null);
 
-    setTimeout(() => {
-      const generatedId = `WL-ORD-${Math.floor(100000 + Math.random() * 900000)}`;
+    try {
+      const orderPayload = {
+        items: items.map((item) => ({
+          productId: item.id.startsWith('prod-') ? undefined : item.id,
+          name: item.name,
+          brand: item.brand,
+          referenceNumber: item.reference_number || undefined,
+          price: item.price + (item.strapOption?.price_addon ?? 0),
+          quantity: item.quantity,
+          imageUrl: item.image,
+          strapOption: item.strapOption,
+        })),
+        totalAmount: subtotal,
+        shippingName: formData.fullName || 'Valued Collector',
+        shippingEmail: formData.email || 'collector@wristloom.com',
+        shippingPhone: formData.phone || '+91 98765 43210',
+        shippingAddress: {
+          addressLine: formData.addressLine || 'Private Atelier Residence',
+          city: formData.city || 'Mumbai',
+          postalCode: formData.postalCode || '400001',
+          country: 'India',
+        },
+        paymentMethod: formData.paymentMethod,
+      };
+
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderPayload),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error ?? 'Failed to place order');
+      }
+
       setOrderConfirmed({
-        id: generatedId,
+        id: data.order.orderReference,
         items: [...items],
         subtotal,
         shipping: {
@@ -64,9 +101,12 @@ export default function CartPage() {
         paymentMethod: formData.paymentMethod,
       });
       clearCart();
-      setIsSubmitting(false);
       setIsCheckoutOpen(false);
-    }, 1000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error creating order');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -413,6 +453,12 @@ export default function CartPage() {
                     </label>
                   </div>
                 </div>
+
+                {errorMsg && (
+                  <div className="p-3 bg-red-900/20 border border-red-500/30 rounded text-xs text-red-400">
+                    {errorMsg}
+                  </div>
+                )}
 
                 <div className="pt-4 border-t border-[rgba(176,141,87,0.15)]">
                   <button

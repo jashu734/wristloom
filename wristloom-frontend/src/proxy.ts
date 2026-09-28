@@ -44,6 +44,18 @@ export async function proxy(req: NextRequest) {
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon');
 
+  // ── Already logged in users visiting /login or /register ─────────
+  if (pathname === '/login' || pathname === '/register') {
+    const token = await getToken({ req, secret: process.env.AUTH_SECRET });
+    if (token) {
+      const role = token.role as string;
+      if (role === 'ADMIN') return NextResponse.redirect(new URL('/admin', req.url));
+      if (role === 'TECHNICIAN') return NextResponse.redirect(new URL('/technician', req.url));
+      return NextResponse.redirect(new URL('/account', req.url));
+    }
+    return NextResponse.next();
+  }
+
   if (isPublic) return NextResponse.next();
 
   // ── Get JWT token (Edge-safe) ───────────────────────────────
@@ -68,6 +80,9 @@ export async function proxy(req: NextRequest) {
 
   // ── Admin-only routes ───────────────────────────────────────
   if (pathname.startsWith('/admin') && role !== 'ADMIN') {
+    if (role === 'TECHNICIAN') {
+      return NextResponse.redirect(new URL('/technician', req.url));
+    }
     return NextResponse.redirect(new URL('/account', req.url));
   }
 

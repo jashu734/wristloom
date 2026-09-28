@@ -11,12 +11,24 @@ export default async function AdminPage() {
   const session = await auth();
   if (!session?.user || session.user.role !== 'ADMIN') redirect('/account');
 
-  const [totalUsers, totalBookings, pendingBookings, activeTechnicians, totalRevenue] = await Promise.all([
+  const [
+    totalUsers,
+    totalBookings,
+    pendingBookings,
+    activeTechnicians,
+    totalRevenue,
+    totalProducts,
+    totalOrders,
+    totalOrderRevenue,
+  ] = await Promise.all([
     db.user.count(),
     db.repairBooking.count(),
     db.repairBooking.count({ where: { status: 'PENDING' } }),
     db.technician.count({ where: { isVerified: true, isAvailable: true } }),
     db.repairBooking.aggregate({ where: { paymentStatus: { in: ['DEPOSIT_PAID', 'FULLY_PAID'] } }, _sum: { depositAmount: true } }),
+    db.product.count(),
+    db.order.count(),
+    db.order.aggregate({ _sum: { totalAmount: true } }),
   ]);
 
   const recentBookings = await db.repairBooking.findMany({
@@ -28,7 +40,9 @@ export default async function AdminPage() {
     },
   });
 
-  const revenue = totalRevenue._sum.depositAmount ?? 0;
+  const serviceRevenue = totalRevenue._sum.depositAmount ?? 0;
+  const watchSalesRevenue = totalOrderRevenue._sum.totalAmount ?? 0;
+  const combinedRevenue = serviceRevenue + watchSalesRevenue;
 
   return (
     <SiteWrapper>
@@ -42,13 +56,14 @@ export default async function AdminPage() {
 
         <div className="container-wl py-10 space-y-8">
           {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
             {[
               { label: 'Total Users', value: totalUsers.toLocaleString() },
-              { label: 'Total Bookings', value: totalBookings.toLocaleString() },
-              { label: 'Pending', value: pendingBookings.toLocaleString(), highlight: pendingBookings > 0 },
-              { label: 'Active Technicians', value: activeTechnicians.toLocaleString() },
-              { label: 'Revenue (Deposits)', value: `₹${(revenue / 100000).toFixed(1)}L` },
+              { label: 'Catalog Watches', value: totalProducts.toLocaleString() },
+              { label: 'Watch Orders', value: totalOrders.toLocaleString() },
+              { label: 'Repair Bookings', value: totalBookings.toLocaleString() },
+              { label: 'Pending Repairs', value: pendingBookings.toLocaleString(), highlight: pendingBookings > 0 },
+              { label: 'Gross Revenue', value: `₹${(combinedRevenue / 100000).toFixed(1)}L` },
             ].map((s: { label: string; value: string; highlight?: boolean }) => (
               <div key={s.label} className={`bg-[#1E1A17] border rounded-[2px] p-4 ${s.highlight ? 'border-amber-700/50' : 'border-[rgba(176,141,87,0.10)]'}`}>
                 <p className={`font-mono text-xl ${s.highlight ? 'text-amber-400' : 'text-[#B08D57]'}`}>{s.value}</p>
@@ -58,12 +73,13 @@ export default async function AdminPage() {
           </div>
 
           {/* Quick nav */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             {[
-              { label: 'All Bookings', href: '/admin/bookings' },
+              { label: 'Bookings', href: '/admin/bookings' },
+              { label: 'Watch Catalog', href: '/admin/products' },
+              { label: 'Orders & Sales', href: '/admin/orders' },
               { label: 'Technicians', href: '/admin/technicians' },
-              { label: 'Live Map', href: '/admin/map' },
-              { label: 'Main Site', href: '/' },
+              { label: 'Live Map Radar', href: '/admin/map' },
             ].map((l) => (
               <Link key={l.href} href={l.href}
                 className="bg-[#1E1A17] border border-[rgba(176,141,87,0.10)] hover:border-[rgba(176,141,87,0.30)] rounded-[2px] p-4 text-sm text-[rgba(237,230,214,0.65)] hover:text-[#EDE6D6] transition-all font-mono text-[10px] tracking-widest uppercase text-center">
