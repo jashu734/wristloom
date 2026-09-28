@@ -1,17 +1,15 @@
 import type { Metadata } from 'next';
-import { auth } from '@/lib/auth';
-import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
-import { SiteWrapper } from '@/components/layout/SiteWrapper';
-import Link from 'next/link';
 import { AdminOrdersClient } from '@/components/admin/AdminOrdersClient';
 
-export const metadata: Metadata = { title: 'Admin — Order Management' };
+export const metadata: Metadata = {
+  title: 'Order & Payment Management',
+  description: 'Track luxury watch acquisitions, concierge shipping, and payment settlements',
+};
+
+export const dynamic = 'force-dynamic';
 
 export default async function AdminOrdersPage() {
-  const session = await auth();
-  if (!session?.user || session.user.role !== 'ADMIN') redirect('/account');
-
   const orders = await db.order.findMany({
     orderBy: { createdAt: 'desc' },
     include: {
@@ -21,28 +19,20 @@ export default async function AdminOrdersPage() {
   });
 
   return (
-    <SiteWrapper>
-      <div className="min-h-screen bg-[#14110F]">
-        <div className="bg-[#1E1A17] border-b border-[rgba(176,141,87,0.10)]">
-          <div className="container-wl py-6 flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Link href="/admin" className="font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.40)] hover:text-[#B08D57]">
-                  ← Control Centre
-                </Link>
-              </div>
-              <h1 className="font-display text-3xl text-[#EDE6D6]">Timepiece Orders & Deliveries</h1>
-            </div>
-            <span className="font-mono text-sm text-[#B08D57] bg-[rgba(176,141,87,0.10)] border border-[rgba(176,141,87,0.20)] px-3 py-1 rounded-[1px]">
-              {orders.length} Acquisition Records
-            </span>
-          </div>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[rgba(176,141,87,0.15)]">
+        <div>
+          <span className="font-mono text-[10px] tracking-widest uppercase text-[#B08D57] block mb-1">
+            Sales & Commerce
+          </span>
+          <h1 className="font-display text-2xl sm:text-3xl text-[#EDE6D6]">Acquisitions & Orders</h1>
         </div>
-
-        <div className="container-wl py-8">
-          <AdminOrdersClient initialOrders={orders} />
-        </div>
+        <span className="font-mono text-xs text-[#B08D57] bg-[rgba(176,141,87,0.10)] border border-[rgba(176,141,87,0.20)] px-3 py-1.5 rounded-[1px]">
+          {orders.length} Total Orders
+        </span>
       </div>
-    </SiteWrapper>
+
+      <AdminOrdersClient initialOrders={orders} />
+    </div>
   );
 }
