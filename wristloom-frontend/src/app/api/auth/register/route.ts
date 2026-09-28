@@ -7,6 +7,8 @@ import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { db } from '@/lib/db';
 
+import { registerLimiter } from '@/lib/rate-limit';
+
 const registerSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
@@ -16,6 +18,15 @@ const registerSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1';
+    const limit = await registerLimiter.check(5, ip);
+    if (!limit.success) {
+      return NextResponse.json(
+        { error: 'Too many registration attempts. Please wait a moment.' },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const data = registerSchema.parse(body);
 

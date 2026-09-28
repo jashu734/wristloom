@@ -30,6 +30,17 @@ export async function GET(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
     }
 
+    const session = await auth();
+    if (session?.user) {
+      const isOwner = booking.customerId === session.user.id;
+      const isAdmin = session.user.role === 'ADMIN';
+      const isTech = booking.technician?.userId === session.user.id;
+      const isGuest = booking.customer.email.includes('guest@wristloom.luxury');
+      if (!isOwner && !isAdmin && !isTech && !isGuest) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
+
     return NextResponse.json(booking);
   } catch (err: any) {
     console.error('[Booking GET Error]', err);
@@ -39,9 +50,43 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id } = await context.params;
     const body = await req.json();
     const { status, notes, technicianId } = body;
+
+    const currentBooking = await db.repairBooking.findUnique({
+      where: { id },
+      include: { technician: true },
+    });
+
+    if (!currentBooking) {
+      return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+    }
+
+    const isAdmin = session.user.role === 'ADMIN';
+    const isAssignedTech = currentBooking.technician?.userId === session.user.id;
+    const isCustomer = currentBooking.customerId === session.user.id;
+
+    if (!isAdmin && !isAssignedTech && !isCustomer) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // Only admin can reassign technician
+    if (technicianId && !isAdmin) {
+      return NextResponse.json({ error: 'Only administrators can reassign technicians' }, { status: 403 });
+    }
+
+    // Customers can only mark their own booking as CANCELLED
+    if (isCustomer && !isAdmin && !isAssignedTech) {
+      if (status && status !== 'CANCELLED') {
+        return NextResponse.json({ error: 'Customers can only cancel pending bookings' }, { status: 403 });
+      }
+    }
 
     const data: Record<string, any> = {};
     if (status) data.status = status;

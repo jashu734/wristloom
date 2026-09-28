@@ -51,8 +51,19 @@ export async function GET() {
   }
 }
 
+import { bookingLimiter } from '@/lib/rate-limit';
+
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1';
+    const limit = await bookingLimiter.check(10, ip);
+    if (!limit.success) {
+      return NextResponse.json(
+        { error: 'Too many booking requests. Please wait a minute.' },
+        { status: 429 }
+      );
+    }
+
     const session = await auth();
     const body = await req.json();
     const data = bookingSchema.parse(body);
