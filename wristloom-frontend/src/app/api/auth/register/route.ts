@@ -30,8 +30,16 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const data = registerSchema.parse(body);
 
+    // Disallow public registration for the dedicated Admin email
+    if (data.email.toLowerCase() === 'wristloom@gmail.com') {
+      return NextResponse.json(
+        { error: 'This email is reserved for system administration and cannot be registered publicly.' },
+        { status: 403 }
+      );
+    }
+
     // Check if email already exists
-    const existing = await db.user.findUnique({ where: { email: data.email } });
+    const existing = await db.user.findUnique({ where: { email: data.email.toLowerCase() } });
     if (existing) {
       return NextResponse.json({ error: 'Email already in use' }, { status: 409 });
     }

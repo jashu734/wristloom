@@ -48,10 +48,11 @@ export async function proxy(req: NextRequest) {
   if (pathname === '/login' || pathname === '/register') {
     const token = await getToken({ req, secret: process.env.AUTH_SECRET });
     if (token) {
-      const role = token.role as string;
-      if (role === 'ADMIN') return NextResponse.redirect(new URL('/admin', req.url));
-      if (role === 'TECHNICIAN') return NextResponse.redirect(new URL('/technician', req.url));
-      return NextResponse.redirect(new URL('/account', req.url));
+      const emailLower = (token.email as string | undefined)?.toLowerCase().trim();
+      const role = emailLower === 'wristloom@gmail.com' ? 'ADMIN' : (token.role as string);
+      if (role === 'ADMIN') return NextResponse.redirect(new URL('/admin/dashboard', req.url));
+      if (role === 'TECHNICIAN') return NextResponse.redirect(new URL('/technician/dashboard', req.url));
+      return NextResponse.redirect(new URL('/customer/dashboard', req.url));
     }
     return NextResponse.next();
   }
@@ -71,19 +72,20 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  const role = token.role as string;
+  const emailLower = (token.email as string | undefined)?.toLowerCase().trim();
+  const role = emailLower === 'wristloom@gmail.com' ? 'ADMIN' : (token.role as string);
 
   // ── Technician-only routes ──────────────────────────────────
   if (pathname.startsWith('/technician') && role !== 'TECHNICIAN' && role !== 'ADMIN') {
-    return NextResponse.redirect(new URL('/account', req.url));
+    return NextResponse.redirect(new URL('/customer/dashboard', req.url));
   }
 
   // ── Admin-only routes ───────────────────────────────────────
   if (pathname.startsWith('/admin') && role !== 'ADMIN') {
     if (role === 'TECHNICIAN') {
-      return NextResponse.redirect(new URL('/technician', req.url));
+      return NextResponse.redirect(new URL('/technician/dashboard', req.url));
     }
-    return NextResponse.redirect(new URL('/account', req.url));
+    return NextResponse.redirect(new URL('/customer/dashboard', req.url));
   }
 
   return NextResponse.next();

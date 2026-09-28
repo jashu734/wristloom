@@ -44,3 +44,4 @@ export function rateLimiter(config: RateLimitConfig) {
 // Pre-configured rate limiters
 export const registerLimiter = rateLimiter({ interval: 60_000 }); // 5 regs / min
 export const bookingLimiter = rateLimiter({ interval: 60_000 });  // 10 bookings / min
+export const loginLimiter = rateLimiter({ interval: 60_000 });    // 10 logins / min

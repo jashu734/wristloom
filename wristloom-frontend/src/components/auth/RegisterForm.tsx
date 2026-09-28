@@ -56,12 +56,12 @@ export function RegisterForm() {
 
     // Auto sign-in after registration
     await signIn('credentials', { email: data.email, password: data.password, redirect: false });
-    router.push('/account');
+    router.push('/customer/dashboard');
     router.refresh();
   }
 
   async function handleGoogleSignIn() {
-    await signIn('google', { callbackUrl: '/account' });
+    await signIn('google', { callbackUrl: '/login/redirect' });
   }
 
   return (

@@ -26,18 +26,22 @@ function CustomAuthAdapter(prisma: typeof db) {
   return {
     ...baseAdapter,
     async createUser(data: any) {
+      const emailLower = data.email?.toLowerCase().trim();
+      const isDedicatedAdmin = emailLower === 'wristloom@gmail.com';
       const user = await prisma.user.create({
         data: {
           name: data.name ?? null,
-          email: data.email,
+          email: emailLower,
           emailVerified: data.emailVerified ?? null,
           profileImage: data.image ?? data.profileImage ?? null,
-          role: 'CUSTOMER',
+          role: isDedicatedAdmin ? 'ADMIN' : 'CUSTOMER',
         },
       });
       // Auto-create wallet for new customer
       try {
-        await prisma.creditWallet.create({ data: { customerId: user.id, balance: 0 } });
+        if (!isDedicatedAdmin) {
+          await prisma.creditWallet.create({ data: { customerId: user.id, balance: 0 } });
+        }
       } catch (e) {
         console.warn('Wallet creation note:', e);
       }
@@ -46,7 +50,7 @@ function CustomAuthAdapter(prisma: typeof db) {
     async updateUser(data: any) {
       const updateData: any = {};
       if (data.name !== undefined) updateData.name = data.name;
-      if (data.email !== undefined) updateData.email = data.email;
+      if (data.email !== undefined) updateData.email = data.email?.toLowerCase().trim();
       if (data.emailVerified !== undefined) updateData.emailVerified = data.emailVerified;
       if (data.image !== undefined) updateData.profileImage = data.image;
       if (data.profileImage !== undefined) updateData.profileImage = data.profileImage;
@@ -63,7 +67,7 @@ function CustomAuthAdapter(prisma: typeof db) {
       return { ...user, image: user.profileImage ?? null };
     },
     async getUserByEmail(email: string) {
-      const user = await prisma.user.findUnique({ where: { email } });
+      const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
       if (!user) return null;
       return { ...user, image: user.profileImage ?? null };
     },
@@ -110,18 +114,37 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
+        intendedRole: { label: 'Intended Role', type: 'text' },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
-        const user = await db.user.findUnique({ where: { email: credentials.email as string } });
+        const emailLower = (credentials.email as string).toLowerCase().trim();
+        const user = await db.user.findUnique({ where: { email: emailLower } });
         if (!user?.passwordHash) return null;
         const valid = await bcrypt.compare(credentials.password as string, user.passwordHash);
         if (!valid) return null;
+
+        // Dedicated admin authority
+        const isDedicatedAdmin = emailLower === 'wristloom@gmail.com';
+        let actualRole = user.role;
+        if (isDedicatedAdmin && actualRole !== 'ADMIN') {
+          await db.user.update({ where: { id: user.id }, data: { role: 'ADMIN' } });
+          actualRole = 'ADMIN';
+        }
+
+        const intendedRole = credentials.intendedRole as string | undefined;
+        if (intendedRole === 'TECHNICIAN' && actualRole !== 'TECHNICIAN' && actualRole !== 'ADMIN') {
+          throw new Error('NOT_A_TECHNICIAN');
+        }
+        if (intendedRole === 'CUSTOMER' && actualRole === 'TECHNICIAN') {
+          throw new Error('IS_A_TECHNICIAN');
+        }
+
         return {
           id: user.id,
           name: user.name,
           email: user.email,
-          role: user.role,
+          role: actualRole,
           phone: user.phone,
           image: user.profileImage,
         };
@@ -136,28 +159,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.phone = (user as any).phone ?? null;
         if (user.image) token.picture = user.image;
         if (user.name) token.name = user.name;
-        if (user.email) token.email = user.email;
+        if (user.email) token.email = (user.email as string).toLowerCase().trim();
       }
-      if (!token.role || token.role === 'CUSTOMER') {
-        if (token.email) {
-          try {
-            const dbUser = await db.user.findUnique({
-              where: { email: token.email },
-              select: { id: true, role: true, phone: true, profileImage: true },
-            });
-            if (dbUser) {
-              token.id = dbUser.id;
-              token.role = dbUser.role;
-              if (dbUser.phone) token.phone = dbUser.phone;
-              if (dbUser.profileImage && !token.picture) token.picture = dbUser.profileImage;
-            }
-          } catch (e) {
-            console.error('[auth] Error fetching user role in jwt callback:', e);
+
+      const emailLower = (token.email as string | undefined)?.toLowerCase().trim();
+      if (emailLower === 'wristloom@gmail.com') {
+        token.role = 'ADMIN';
+      }
+
+      if (emailLower) {
+        try {
+          const dbUser = await db.user.findUnique({
+            where: { email: emailLower },
+            select: { id: true, role: true, phone: true, profileImage: true },
+          });
+          if (dbUser) {
+            token.id = dbUser.id;
+            token.role = emailLower === 'wristloom@gmail.com' ? 'ADMIN' : dbUser.role;
+            if (dbUser.phone) token.phone = dbUser.phone;
+            if (dbUser.profileImage && !token.picture) token.picture = dbUser.profileImage;
           }
+        } catch (e) {
+          console.error('[auth] Error fetching user role in jwt callback:', e);
         }
       }
+
       if (!token.role) {
-        token.role = 'CUSTOMER';
+        token.role = emailLower === 'wristloom@gmail.com' ? 'ADMIN' : 'CUSTOMER';
       }
       if (trigger === 'update' && session) {
         const updateData = session.user ?? session;
@@ -171,8 +199,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.id = (token.id as string) || (token.sub as string);
         if (token.name) session.user.name = token.name as string;
-        if (token.email) session.user.email = token.email as string;
-        session.user.role = (token.role as UserRole) ?? 'CUSTOMER';
+        if (token.email) session.user.email = (token.email as string).toLowerCase().trim();
+        session.user.role = ((token.email as string)?.toLowerCase().trim() === 'wristloom@gmail.com' ? 'ADMIN' : token.role as UserRole) ?? 'CUSTOMER';
         session.user.phone = (token.phone as string | null) ?? null;
         if (token.picture) {
           session.user.image = token.picture as string;

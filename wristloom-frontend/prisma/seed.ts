@@ -174,6 +174,8 @@ const INITIAL_PRODUCTS = [
   },
 ];
 
+import bcrypt from 'bcryptjs';
+
 async function main() {
   console.log('Seeding initial products into Supabase PostgreSQL...');
   for (const prod of INITIAL_PRODUCTS) {
@@ -186,6 +188,69 @@ async function main() {
   }
   const count = await db.product.count();
   console.log(`✓ Total products in database: ${count}`);
+
+  console.log('Seeding dedicated Admin and Technician accounts...');
+  
+  // 1. Dedicated Admin: wristloom@gmail.com
+  const adminPasswordHash = await bcrypt.hash('Admin@wristloom2026', 12);
+  const adminUser = await db.user.upsert({
+    where: { email: 'wristloom@gmail.com' },
+    update: {
+      role: 'ADMIN',
+      name: 'Wristloom Administrator',
+      passwordHash: adminPasswordHash,
+    },
+    create: {
+      email: 'wristloom@gmail.com',
+      name: 'Wristloom Administrator',
+      passwordHash: adminPasswordHash,
+      role: 'ADMIN',
+      phone: '+91 98765 00001',
+    },
+  });
+  console.log(`✓ Seeded dedicated Admin: ${adminUser.email} (Role: ${adminUser.role})`);
+
+  // 2. Certified Master Horologist: technician@wristloom.com
+  const techPasswordHash = await bcrypt.hash('Tech@wristloom2026', 12);
+  const techUser = await db.user.upsert({
+    where: { email: 'technician@wristloom.com' },
+    update: {
+      role: 'TECHNICIAN',
+      name: 'Arjun Mehta',
+      passwordHash: techPasswordHash,
+    },
+    create: {
+      email: 'technician@wristloom.com',
+      name: 'Arjun Mehta',
+      passwordHash: techPasswordHash,
+      role: 'TECHNICIAN',
+      phone: '+91 98765 00002',
+    },
+  });
+
+  await db.technician.upsert({
+    where: { userId: techUser.id },
+    update: {
+      isAvailable: true,
+      isVerified: true,
+      rating: 4.95,
+      yearsExperience: 12,
+    },
+    create: {
+      userId: techUser.id,
+      bio: 'Swiss Horological Academy graduate specializing in high-complication overhauls.',
+      yearsExperience: 12,
+      specializations: ['Rolex Certified', 'Patek Philippe Complications', 'Tourbillon Regulation'],
+      brandsServiced: ['Rolex', 'Patek Philippe', 'Audemars Piguet', 'Omega'],
+      rating: 4.95,
+      completedServices: 184,
+      isVerified: true,
+      isAvailable: true,
+      currentLatitude: 18.9667,
+      currentLongitude: 72.8081,
+    },
+  });
+  console.log(`✓ Seeded Master Horologist: ${techUser.email} (Role: ${techUser.role})`);
 }
 
 main()
