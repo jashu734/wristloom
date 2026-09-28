@@ -1,0 +1,421 @@
+// ============================================================
+// Wristloom — Prisma Schema
+// PostgreSQL (Supabase) | NextAuth.js v5 | Full Platform
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ────────────────────────────────────────────────────
+
+enum UserRole {
+  CUSTOMER
+  TECHNICIAN
+  ADMIN
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  TECHNICIAN_ASSIGNED
+  TECHNICIAN_EN_ROUTE
+  TECHNICIAN_ARRIVED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  DEPOSIT_PAID
+  FULLY_PAID
+  REFUNDED
+}
+
+enum RequestStatus {
+  PENDING
+  IN_REVIEW
+  APPROVED
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+enum NotificationType {
+  BOOKING_CONFIRMED
+  TECHNICIAN_ASSIGNED
+  TECHNICIAN_EN_ROUTE
+  TECHNICIAN_ARRIVED
+  SERVICE_IN_PROGRESS
+  SERVICE_COMPLETED
+  BOOKING_CANCELLED
+  NEW_BOOKING_ASSIGNED
+  REVIEW_RECEIVED
+  CREDIT_EARNED
+}
+
+// ─── NextAuth.js Models ───────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Core User ────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  phone         String?
+  passwordHash  String?
+  role          UserRole  @default(CUSTOMER)
+  profileImage  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // NextAuth relations
+  accounts Account[]
+  sessions Session[]
+
+  // Platform relations
+  addresses         Address[]
+  bookingsAsCustomer RepairBooking[] @relation("CustomerBookings")
+  technician        Technician?
+  watchVaultItems   WatchVaultItem[]
+  authRequests      AuthenticationRequest[]
+  tradeInRequests   TradeInRequest[]
+  creditWallet      CreditWallet?
+  notifications     Notification[]
+  reviewsGiven      Review[]        @relation("ReviewsGiven")
+
+  @@map("users")
+}
+
+// ─── Address ──────────────────────────────────────────────────
+
+model Address {
+  id               String   @id @default(cuid())
+  userId           String
+  fullName         String
+  phone            String
+  addressLine1     String
+  addressLine2     String?
+  city             String
+  state            String
+  postalCode       String
+  country          String   @default("India")
+  latitude         Float
+  longitude        Float
+  formattedAddress String
+  isDefault        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings RepairBooking[]
+
+  @@map("addresses")
+}
+
+// ─── Technician Profile ───────────────────────────────────────
+
+model Technician {
+  id                  String    @id @default(cuid())
+  userId              String    @unique
+  bio                 String?   @db.Text
+  yearsExperience     Int       @default(0)
+  specializations     String[]
+  certifications      Json      @default("[]")
+  brandsServiced      String[]
+  rating              Float     @default(5.0)
+  completedServices   Int       @default(0)
+  serviceRadiusKm     Int       @default(20)
+  isVerified          Boolean   @default(false)
+  isAvailable         Boolean   @default(true)
+  currentLatitude     Float?
+  currentLongitude    Float?
+  lastLocationUpdate  DateTime?
+  twoFactorEnabled    Boolean   @default(false)
+  twoFactorSecret     String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings          RepairBooking[]    @relation("TechnicianBookings")
+  locationHistory   TechnicianLocation[]
+  reviews           Review[]
+
+  @@map("technicians")
+}
+
+// ─── Repair Booking ───────────────────────────────────────────
+
+model RepairBooking {
+  id                  String        @id @default(cuid())
+  bookingReference    String        @unique
+  customerId          String
+  technicianId        String?
+  serviceType         String
+  watchBrand          String?
+  watchModel          String?
+  watchReferenceNumber String?
+  issueDescription    String?       @db.Text
+  issueImages         String[]
+  scheduledDate       DateTime
+  scheduledTimeStart  String
+  scheduledTimeEnd    String
+  addressId           String?
+  status              BookingStatus @default(PENDING)
+  estimatedPrice      Float?
+  finalPrice          Float?
+  depositAmount       Float?
+  paymentStatus       PaymentStatus @default(UNPAID)
+  razorpayOrderId     String?
+  razorpayPaymentId   String?
+  serviceImages       String[]
+  notes               String?       @db.Text
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  customer         User               @relation("CustomerBookings", fields: [customerId], references: [id])
+  technician       Technician?        @relation("TechnicianBookings", fields: [technicianId], references: [id])
+  address          Address?           @relation(fields: [addressId], references: [id])
+  locationUpdates  TechnicianLocation[]
+  notifications    Notification[]
+  serviceHistory   ServiceHistory[]
+
+  @@map("repair_bookings")
+}
+
+// ─── Technician Location (Real-time tracking) ─────────────────
+
+model TechnicianLocation {
+  id           String   @id @default(cuid())
+  technicianId String
+  bookingId    String?
+  latitude     Float
+  longitude    Float
+  accuracy     Float?
+  heading      Float?
+  speed        Float?
+  recordedAt   DateTime @default(now())
+
+  technician Technician     @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+  booking    RepairBooking? @relation(fields: [bookingId], references: [id])
+
+  @@index([bookingId, recordedAt])
+  @@index([technicianId, recordedAt])
+  @@map("technician_locations")
+}
+
+// ─── Watch Vault ──────────────────────────────────────────────
+
+model WatchVaultItem {
+  id                  String   @id @default(cuid())
+  ownerId             String
+  watchName           String
+  brand               String
+  referenceNumber     String?
+  movement            String?
+  caseSize            String?
+  dialColor           String?
+  strapMaterial       String?
+  serialNumber        String?
+  yearOfManufacture   Int?
+  purchaseDate        DateTime?
+  purchasePrice       Float?
+  lastServiceDate     DateTime?
+  serviceDueDate      DateTime?
+  healthStatus        String   @default("Excellent")
+  notes               String?  @db.Text
+  photoUrls           String[]
+  documentUrls        String[]
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  owner          User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  serviceHistory ServiceHistory[]
+
+  @@map("watch_vault_items")
+}
+
+model ServiceHistory {
+  id              String   @id @default(cuid())
+  vaultItemId     String?
+  bookingId       String?
+  date            DateTime
+  serviceType     String
+  description     String   @db.Text
+  technicianName  String
+  cost            Float?
+  warrantyUntil   DateTime?
+  beforePhotoUrl  String?
+  afterPhotoUrl   String?
+  createdAt       DateTime @default(now())
+
+  vaultItem WatchVaultItem? @relation(fields: [vaultItemId], references: [id])
+  booking   RepairBooking?  @relation(fields: [bookingId], references: [id])
+
+  @@map("service_history")
+}
+
+// ─── Authentication Request ───────────────────────────────────
+
+model AuthenticationRequest {
+  id                  String        @id @default(cuid())
+  customerId          String?
+  watchBrand          String
+  watchModel          String
+  referenceNumber     String?
+  description         String        @db.Text
+  ownershipContext    String?
+  photoUrls           String[]
+  contactName         String
+  contactEmail        String
+  contactPhone        String
+  status              RequestStatus @default(PENDING)
+  appraisalReference  String        @unique
+  certificationId     String?
+  result              String?       // authentic | non_authentic | inconclusive
+  notes               String?       @db.Text
+  assignedTo          String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  customer User? @relation(fields: [customerId], references: [id])
+
+  @@map("authentication_requests")
+}
+
+// ─── Trade-In Request ─────────────────────────────────────────
+
+model TradeInRequest {
+  id                String        @id @default(cuid())
+  customerId        String?
+  watchBrand        String
+  watchModel        String
+  referenceNumber   String?
+  condition         String
+  photoUrls         String[]
+  contactName       String
+  contactEmail      String
+  contactPhone      String
+  desiredCreditUse  String?
+  status            RequestStatus @default(PENDING)
+  valuationCredit   Float?
+  tradeInReference  String        @unique
+  notes             String?       @db.Text
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  customer User? @relation(fields: [customerId], references: [id])
+
+  @@map("trade_in_requests")
+}
+
+// ─── Credit Wallet ────────────────────────────────────────────
+
+model CreditWallet {
+  id           String              @id @default(cuid())
+  customerId   String              @unique
+  balance      Float               @default(0)
+  currency     String              @default("INR")
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  customer     User                @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  transactions CreditTransaction[]
+
+  @@map("credit_wallets")
+}
+
+model CreditTransaction {
+  id          String   @id @default(cuid())
+  walletId    String
+  type        String   // credit | debit
+  amount      Float
+  description String
+  reference   String?
+  createdAt   DateTime @default(now())
+
+  wallet CreditWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@map("credit_transactions")
+}
+
+// ─── Reviews ──────────────────────────────────────────────────
+
+model Review {
+  id            String   @id @default(cuid())
+  technicianId  String
+  customerId    String
+  bookingId     String?
+  rating        Int
+  title         String
+  body          String   @db.Text
+  serviceType   String
+  watchBrand    String?
+  verified      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  technician Technician @relation(fields: [technicianId], references: [id])
+  customer   User       @relation("ReviewsGiven", fields: [customerId], references: [id])
+
+  @@map("reviews")
+}
+
+// ─── Notifications ────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  bookingId String?
+  type      NotificationType
+  title     String
+  body      String
+  read      Boolean          @default(false)
+  data      Json?
+  createdAt DateTime         @default(now())
+
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking RepairBooking? @relation(fields: [bookingId], references: [id])
+
+  @@index([userId, read])
+  @@map("notifications")
+}

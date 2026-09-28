@@ -1,0 +1,280 @@
+'use client';
+
+import * as React from 'react';
+import Link from 'next/link';
+import { format, isToday, isTomorrow, parseISO } from 'date-fns';
+import { Badge } from '@/components/primitives/Badge';
+import { Button } from '@/components/primitives/Button';
+import { LocationTracker } from './LocationTracker';
+import {
+  MapPin, Navigation, Phone, Watch, Clock, CheckCircle,
+  AlertCircle, Loader2, ToggleLeft, ToggleRight,
+} from 'lucide-react';
+
+type BookingStatus =
+  | 'PENDING' | 'CONFIRMED' | 'TECHNICIAN_ASSIGNED' | 'TECHNICIAN_EN_ROUTE'
+  | 'TECHNICIAN_ARRIVED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+
+interface Booking {
+  id: string;
+  bookingReference: string;
+  serviceType: string;
+  watchBrand?: string;
+  watchModel?: string;
+  issueDescription?: string;
+  scheduledDate: string;
+  scheduledTimeStart: string;
+  scheduledTimeEnd: string;
+  status: BookingStatus;
+  customer: { name: string; phone: string; profileImage?: string };
+  address?: {
+    formattedAddress: string;
+    addressLine2?: string;
+    latitude: number;
+    longitude: number;
+    fullName: string;
+    phone: string;
+  };
+}
+
+const STATUS_FLOW: { from: BookingStatus; to: BookingStatus; label: string }[] = [
+  { from: 'TECHNICIAN_ASSIGNED', to: 'TECHNICIAN_EN_ROUTE', label: "I'm On My Way" },
+  { from: 'TECHNICIAN_EN_ROUTE', to: 'TECHNICIAN_ARRIVED', label: 'I\'ve Arrived' },
+  { from: 'TECHNICIAN_ARRIVED', to: 'IN_PROGRESS', label: 'Start Service' },
+  { from: 'IN_PROGRESS', to: 'COMPLETED', label: 'Complete Service' },
+];
+
+const STATUS_COLORS: Record<BookingStatus, string> = {
+  PENDING: 'neutral', CONFIRMED: 'neutral', TECHNICIAN_ASSIGNED: 'brass',
+  TECHNICIAN_EN_ROUTE: 'limited', TECHNICIAN_ARRIVED: 'healthy',
+  IN_PROGRESS: 'certified', COMPLETED: 'excellent', CANCELLED: 'oxblood',
+};
+
+export function TechnicianDashboard({ userId, userName }: { userId: string; userName: string }) {
+  const [bookings, setBookings] = React.useState<Booking[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [isAvailable, setIsAvailable] = React.useState(true);
+  const [activeBookingId, setActiveBookingId] = React.useState<string | null>(null);
+  const [techId, setTechId] = React.useState<string | null>(null);
+  const [activeTab, setActiveTab] = React.useState<'today' | 'upcoming' | 'completed'>('today');
+
+  // Fetch technician profile + bookings
+  React.useEffect(() => {
+    async function load() {
+      const [techRes, bookingsRes] = await Promise.all([
+        fetch('/api/technicians'),
+        fetch('/api/bookings'),
+      ]);
+      const techList = await techRes.json();
+      const myTech = Array.isArray(techList) ? techList.find((t: any) => t.userId === userId) : null;
+      if (myTech) {
+        setTechId(myTech.id);
+        setIsAvailable(myTech.isAvailable);
+      }
+      if (bookingsRes.ok) setBookings(await bookingsRes.json());
+      setLoading(false);
+    }
+    load();
+  }, [userId]);
+
+  async function updateStatus(bookingId: string, status: BookingStatus) {
+    const res = await fetch(`/api/bookings/${bookingId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: updated.status } : b)));
+      if (status === 'TECHNICIAN_EN_ROUTE') setActiveBookingId(bookingId);
+      if (status === 'TECHNICIAN_ARRIVED' || status === 'COMPLETED') setActiveBookingId(null);
+    }
+  }
+
+  async function toggleAvailability() {
+    if (!techId) return;
+    const next = !isAvailable;
+    await fetch(`/api/technicians/${techId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isAvailable: next }),
+    });
+    setIsAvailable(next);
+  }
+
+  const today = bookings.filter((b) => isToday(parseISO(b.scheduledDate)) && b.status !== 'COMPLETED' && b.status !== 'CANCELLED');
+  const upcoming = bookings.filter((b) => !isToday(parseISO(b.scheduledDate)) && b.status !== 'COMPLETED' && b.status !== 'CANCELLED');
+  const completed = bookings.filter((b) => b.status === 'COMPLETED');
+  const shown = activeTab === 'today' ? today : activeTab === 'upcoming' ? upcoming : completed;
+
+  if (loading) return (
+    <div className="min-h-screen bg-[#14110F] flex items-center justify-center">
+      <Loader2 className="w-6 h-6 text-[#B08D57] animate-spin" />
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-[#14110F]">
+      {/* GPS location tracker — only active when en route */}
+      {activeBookingId && techId && (
+        <LocationTracker bookingId={activeBookingId} technicianId={techId} />
+      )}
+
+      {/* Header */}
+      <div className="bg-[#1E1A17] border-b border-[rgba(176,141,87,0.10)] sticky top-0 z-20">
+        <div className="container-wl py-4 flex items-center justify-between">
+          <div>
+            <p className="font-mono text-[9px] tracking-widest uppercase text-[rgba(237,230,214,0.35)]">Technician Portal</p>
+            <h1 className="font-display text-xl text-[#EDE6D6]">{userName}</h1>
+          </div>
+          <button onClick={toggleAvailability} className="flex items-center gap-2 text-sm">
+            {isAvailable ? (
+              <><ToggleRight className="w-6 h-6 text-emerald-400" /><span className="text-emerald-400 font-mono text-[10px] uppercase tracking-widest">Available</span></>
+            ) : (
+              <><ToggleLeft className="w-6 h-6 text-[rgba(237,230,214,0.30)]" /><span className="text-[rgba(237,230,214,0.30)] font-mono text-[10px] uppercase tracking-widest">Offline</span></>
+            )}
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="container-wl pb-3 flex gap-1">
+          {([['today', `Today (${today.length})`], ['upcoming', `Upcoming (${upcoming.length})`], ['completed', 'Completed']] as const).map(([id, label]) => (
+            <button key={id} onClick={() => setActiveTab(id)}
+              className={`font-mono text-[10px] tracking-widest uppercase px-3 py-1.5 rounded-[2px] transition-colors ${activeTab === id ? 'bg-[rgba(176,141,87,0.12)] text-[#B08D57] border border-[rgba(176,141,87,0.25)]' : 'text-[rgba(237,230,214,0.35)] hover:text-[#EDE6D6]'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="container-wl py-8 space-y-4">
+        {shown.length === 0 && (
+          <div className="text-center py-16">
+            <p className="text-[rgba(237,230,214,0.35)] text-sm">No {activeTab} bookings</p>
+          </div>
+        )}
+        {shown.map((booking) => (
+          <BookingCard
+            key={booking.id}
+            booking={booking}
+            onUpdateStatus={updateStatus}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BookingCard({ booking, onUpdateStatus }: { booking: Booking; onUpdateStatus: (id: string, s: BookingStatus) => void }) {
+  const [updating, setUpdating] = React.useState(false);
+  const nextAction = STATUS_FLOW.find((f) => f.from === booking.status);
+
+  async function handleStatusChange() {
+    if (!nextAction) return;
+    setUpdating(true);
+    await onUpdateStatus(booking.id, nextAction.to);
+    setUpdating(false);
+  }
+
+  const navUrl = booking.address
+    ? `https://www.google.com/maps/dir/?api=1&destination=${booking.address.latitude},${booking.address.longitude}`
+    : null;
+
+  const dateStr = parseISO(booking.scheduledDate);
+  const dateLabel = isToday(dateStr) ? 'Today' : isTomorrow(dateStr) ? 'Tomorrow' : format(dateStr, 'd MMM');
+
+  return (
+    <div className="bg-[#1E1A17] border border-[rgba(176,141,87,0.12)] rounded-[2px] overflow-hidden">
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-5 py-3 border-b border-[rgba(176,141,87,0.08)]">
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-[10px] text-[rgba(237,230,214,0.40)]">{booking.bookingReference}</span>
+          <Badge variant={STATUS_COLORS[booking.status] as any}>
+            {booking.status.replace(/_/g, ' ')}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-[rgba(237,230,214,0.45)]">
+          <Clock className="w-3 h-3" />
+          {dateLabel} · {booking.scheduledTimeStart}–{booking.scheduledTimeEnd}
+        </div>
+      </div>
+
+      <div className="p-5 space-y-4">
+        {/* Customer */}
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-[rgba(176,141,87,0.10)] flex items-center justify-center flex-shrink-0">
+            <span className="font-mono text-[10px] text-[#B08D57]">
+              {booking.customer.name?.charAt(0).toUpperCase()}
+            </span>
+          </div>
+          <div>
+            <p className="text-sm text-[#EDE6D6]">{booking.customer.name}</p>
+            <a href={`tel:${booking.customer.phone}`} className="flex items-center gap-1 text-xs text-[#B08D57] hover:underline mt-0.5">
+              <Phone className="w-3 h-3" /> {booking.customer.phone}
+            </a>
+          </div>
+        </div>
+
+        {/* Watch + issue */}
+        {(booking.watchBrand || booking.issueDescription) && (
+          <div className="flex items-start gap-2">
+            <Watch className="w-4 h-4 text-[rgba(176,141,87,0.40)] flex-shrink-0 mt-0.5" />
+            <div>
+              {booking.watchBrand && (
+                <p className="text-sm text-[rgba(237,230,214,0.70)]">{booking.watchBrand} {booking.watchModel}</p>
+              )}
+              {booking.issueDescription && (
+                <p className="text-xs text-[rgba(237,230,214,0.40)] mt-0.5 leading-relaxed">{booking.issueDescription}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Address */}
+        {booking.address && (
+          <div className="flex items-start gap-2">
+            <MapPin className="w-4 h-4 text-[rgba(176,141,87,0.40)] flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm text-[rgba(237,230,214,0.70)]">{booking.address.formattedAddress}</p>
+              {booking.address.addressLine2 && (
+                <p className="text-xs text-[rgba(237,230,214,0.45)]">{booking.address.addressLine2}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-3 pt-1">
+          {navUrl && (
+            <a
+              href={navUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 font-mono text-[10px] tracking-widest uppercase px-4 py-2.5 border border-[rgba(176,141,87,0.25)] text-[#B08D57] hover:bg-[rgba(176,141,87,0.08)] rounded-[2px] transition-colors"
+            >
+              <Navigation className="w-3.5 h-3.5" />
+              Start Navigation
+            </a>
+          )}
+          {nextAction && (
+            <Button
+              variant={nextAction.to === 'TECHNICIAN_EN_ROUTE' ? 'oxblood' : 'primary'}
+              size="md"
+              className="flex-1"
+              onClick={handleStatusChange}
+              loading={updating}
+            >
+              {nextAction.to === 'TECHNICIAN_EN_ROUTE' && "🚗 "}
+              {nextAction.label}
+            </Button>
+          )}
+          {booking.status === 'COMPLETED' && (
+            <div className="flex items-center gap-2 text-sm text-emerald-400">
+              <CheckCircle className="w-4 h-4" /> Service Completed
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
