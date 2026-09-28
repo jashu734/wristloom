@@ -7,7 +7,7 @@ import bcrypt from 'bcryptjs';
 const profileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').optional(),
   phone: z.string().optional().nullable(),
-  profileImage: z.string().url().optional().nullable().or(z.literal('')),
+  profileImage: z.string().optional().nullable(),
 });
 
 const passwordSchema = z.object({

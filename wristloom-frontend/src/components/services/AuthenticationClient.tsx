@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { Shield, Search, FileText, CheckCircle, Award, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/primitives/Button';
 import { generateRef } from '@/lib/utils';
@@ -227,9 +228,18 @@ export function ConfirmationPanel({
           <p className="font-mono text-lg text-[#B08D57] tracking-wider">{refNumber}</p>
         </div>
 
-        <p className="font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.35)]">
+        <p className="font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.35)] mb-6">
           Save this reference number for your records
         </p>
+
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Button variant="primary" size="md" asChild>
+            <Link href="/account">View in My Account</Link>
+          </Button>
+          <Button variant="ghost" size="md" asChild>
+            <Link href="/">Return to Home</Link>
+          </Button>
+        </div>
       </div>
     </div>
   );

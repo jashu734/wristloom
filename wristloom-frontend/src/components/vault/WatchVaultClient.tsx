@@ -24,8 +24,39 @@ import Link from 'next/link';
 export function WatchVaultClient() {
   const [items, setItems] = React.useState<VaultItem[]>(MOCK_VAULT_ITEMS);
   const [selected, setSelected] = React.useState<string | null>(MOCK_VAULT_ITEMS[0]?.id ?? null);
-  const [isAuthenticated] = React.useState(true); // Simulated auth
+  const [isAuthenticated] = React.useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
+  const [isSaving, setIsSaving] = React.useState(false);
+
+  // Load real items from database if available
+  React.useEffect(() => {
+    fetch('/api/vault')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped: VaultItem[] = data.map((d: any) => ({
+            id: d.id,
+            owner_id: d.ownerId,
+            brand: d.brand,
+            watch_name: d.watchName,
+            reference_number: d.referenceNumber || 'REF-TBD',
+            movement: d.movement || 'Automatic',
+            case_size: d.caseSize || '40mm',
+            health_status: 'Excellent',
+            purchase_price: d.purchasePrice ?? undefined,
+            photo_urls: d.photoUrls && d.photoUrls.length > 0 ? d.photoUrls : [
+              'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=600&q=80',
+            ],
+            document_urls: [],
+            service_history: [],
+            created_at: d.createdAt,
+          }));
+          setItems(mapped);
+          setSelected(mapped[0]?.id ?? null);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // New watch form state
   const [newWatch, setNewWatch] = React.useState({
@@ -40,40 +71,67 @@ export function WatchVaultClient() {
 
   const selectedItem = items.find((i) => i.id === selected);
 
-  function handleAddWatch(e: React.FormEvent) {
+  async function handleAddWatch(e: React.FormEvent) {
     e.preventDefault();
     if (!newWatch.watch_name.trim()) return;
 
-    const newItem: VaultItem = {
-      id: `vault_${Date.now()}`,
-      owner_id: 'user_vault',
-      brand: newWatch.brand,
-      watch_name: newWatch.watch_name,
-      reference_number: newWatch.reference_number || 'REF-TBD',
-      movement: newWatch.movement,
-      case_size: newWatch.case_size,
-      health_status: newWatch.health_status,
-      purchase_price: newWatch.purchase_price ? parseFloat(newWatch.purchase_price) : undefined,
-      photo_urls: [
-        'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=600&q=80',
-      ],
-      document_urls: [],
-      service_history: [],
-      created_at: new Date().toISOString(),
-    };
+    setIsSaving(true);
+    const photoUrl = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=600&q=80';
 
-    setItems((prev) => [newItem, ...prev]);
-    setSelected(newItem.id);
-    setIsAddModalOpen(false);
-    setNewWatch({
-      brand: 'Rolex',
-      watch_name: '',
-      reference_number: '',
-      movement: 'Automatic',
-      case_size: '40mm',
-      health_status: 'Excellent',
-      purchase_price: '',
-    });
+    try {
+      const res = await fetch('/api/vault', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          watchName: newWatch.watch_name,
+          brand: newWatch.brand,
+          referenceNumber: newWatch.reference_number || undefined,
+          movement: newWatch.movement || undefined,
+          caseSize: newWatch.case_size || undefined,
+          purchasePrice: newWatch.purchase_price ? parseFloat(newWatch.purchase_price) : undefined,
+          photoUrls: [photoUrl],
+        }),
+      });
+
+      let newItemId = `vault_${Date.now()}`;
+      if (res.ok) {
+        const saved = await res.json();
+        newItemId = saved.id;
+      }
+
+      const newItem: VaultItem = {
+        id: newItemId,
+        owner_id: 'user_vault',
+        brand: newWatch.brand,
+        watch_name: newWatch.watch_name,
+        reference_number: newWatch.reference_number || 'REF-TBD',
+        movement: newWatch.movement,
+        case_size: newWatch.case_size,
+        health_status: newWatch.health_status,
+        purchase_price: newWatch.purchase_price ? parseFloat(newWatch.purchase_price) : undefined,
+        photo_urls: [photoUrl],
+        document_urls: [],
+        service_history: [],
+        created_at: new Date().toISOString(),
+      };
+
+      setItems((prev) => [newItem, ...prev]);
+      setSelected(newItem.id);
+      setIsAddModalOpen(false);
+      setNewWatch({
+        brand: 'Rolex',
+        watch_name: '',
+        reference_number: '',
+        movement: 'Automatic',
+        case_size: '40mm',
+        health_status: 'Excellent',
+        purchase_price: '',
+      });
+    } catch (err) {
+      console.error('Failed to save to database:', err);
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   if (!isAuthenticated) {

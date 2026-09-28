@@ -55,26 +55,42 @@ const QUICK_LINKS = [
 
 type Tab = 'overview' | 'vault' | 'orders' | 'credits' | 'settings';
 
+interface UserProfile {
+  id: string;
+  name: string | null;
+  email: string;
+  phone: string | null;
+  role: string;
+  profileImage: string | null;
+  createdAt: string;
+  creditWallet?: { balance: number };
+}
+
 export function AccountClient() {
   const { data: session, update } = useSession();
   const [activeTab, setActiveTab] = React.useState<Tab>('overview');
   const [realWalletBalance, setRealWalletBalance] = React.useState<number | null>(null);
+  const [profile, setProfile] = React.useState<UserProfile | null>(null);
 
   React.useEffect(() => {
     fetch('/api/user/profile')
       .then((r) => r.ok ? r.json() : null)
       .then((d) => {
-        if (d?.user?.creditWallet?.balance !== undefined) {
-          setRealWalletBalance(d.user.creditWallet.balance);
+        if (d?.user) {
+          setProfile(d.user);
+          if (d.user.creditWallet?.balance !== undefined) {
+            setRealWalletBalance(d.user.creditWallet.balance);
+          }
         }
       })
       .catch(() => {});
-  }, []);
+  }, [session?.user]);
 
-  const displayName = session?.user?.name || DEMO_USER.name;
-  const displayEmail = session?.user?.email || DEMO_USER.email;
-  const displayAvatar = session?.user?.image || DEMO_USER.avatar;
+  const displayName = profile?.name || session?.user?.name || DEMO_USER.name;
+  const displayEmail = profile?.email || session?.user?.email || DEMO_USER.email;
+  const displayAvatar = profile?.profileImage || session?.user?.image || DEMO_USER.avatar;
   const displayCredits = realWalletBalance !== null ? realWalletBalance : DEMO_USER.credit_balance;
+  const memberSinceYear = profile?.createdAt ? new Date(profile.createdAt).getFullYear() : new Date(DEMO_USER.member_since).getFullYear();
 
   return (
     <div className="min-h-screen bg-[#14110F]">
@@ -94,7 +110,7 @@ export function AccountClient() {
               </div>
               <div>
                 <p className="font-mono text-[9px] tracking-widest uppercase text-[rgba(237,230,214,0.40)] mb-0.5">
-                  Member since {new Date(DEMO_USER.member_since).getFullYear()}
+                  Member since {memberSinceYear}
                 </p>
                 <h1 className="font-display text-xl text-[#EDE6D6]">{displayName}</h1>
                 <p className="text-xs text-[rgba(237,230,214,0.45)]">{displayEmail}</p>
@@ -151,7 +167,12 @@ export function AccountClient() {
         {activeTab === 'vault' && <VaultTab />}
         {activeTab === 'orders' && <OrdersTab />}
         {activeTab === 'credits' && <CreditsTab />}
-        {activeTab === 'settings' && <SettingsTab />}
+        {activeTab === 'settings' && (
+          <SettingsTab
+            profile={profile}
+            onProfileUpdate={(updated) => setProfile((prev) => (prev ? { ...prev, ...updated } : null))}
+          />
+        )}
       </div>
     </div>
   );
@@ -384,30 +405,29 @@ function CreditsTab() {
 }
 
 // ─── Settings Tab ─────────────────────────────────────────────
-function SettingsTab() {
+function SettingsTab({
+  profile,
+  onProfileUpdate,
+}: {
+  profile: UserProfile | null;
+  onProfileUpdate: (updated: Partial<UserProfile>) => void;
+}) {
   const { data: session, update } = useSession();
   const [isEditing, setIsEditing] = React.useState(false);
-  const [name, setName] = React.useState(session?.user?.name ?? '');
-  const [phone, setPhone] = React.useState(session?.user?.phone ?? '');
+  const [name, setName] = React.useState(profile?.name || session?.user?.name || '');
+  const [phone, setPhone] = React.useState(profile?.phone || session?.user?.phone || '');
   const [isSaving, setIsSaving] = React.useState(false);
   const [feedback, setFeedback] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   React.useEffect(() => {
-    if (session?.user) {
-      setName(session.user.name ?? '');
-      setPhone(session.user.phone ?? '');
+    if (profile) {
+      if (profile.name !== undefined && profile.name !== null) setName(profile.name);
+      if (profile.phone !== undefined && profile.phone !== null) setPhone(profile.phone);
+    } else if (session?.user) {
+      if (session.user.name) setName(session.user.name);
+      if (session.user.phone) setPhone(session.user.phone);
     }
-    // Also sync from database
-    fetch('/api/user/profile')
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => {
-        if (d?.user) {
-          if (d.user.name) setName(d.user.name);
-          if (d.user.phone) setPhone(d.user.phone);
-        }
-      })
-      .catch(() => {});
-  }, [session?.user]);
+  }, [profile, session?.user]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -424,6 +444,10 @@ function SettingsTab() {
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error ?? 'Failed to update profile');
+      }
+
+      if (data.user) {
+        onProfileUpdate(data.user);
       }
 
       await update({
@@ -555,7 +579,7 @@ function SettingsTab() {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="font-mono text-[9px] tracking-widest uppercase text-[rgba(237,230,214,0.35)] mb-0.5">Full Name</p>
-                  <p className="text-sm text-[#EDE6D6]">{session?.user?.name || 'Valued Collector'}</p>
+                  <p className="text-sm text-[#EDE6D6]">{profile?.name || session?.user?.name || 'Valued Collector'}</p>
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)}>Edit</Button>
               </div>
@@ -563,14 +587,14 @@ function SettingsTab() {
               <div className="flex items-center justify-between gap-4 border-t border-[rgba(176,141,87,0.06)] pt-3">
                 <div>
                   <p className="font-mono text-[9px] tracking-widest uppercase text-[rgba(237,230,214,0.35)] mb-0.5">Email Address</p>
-                  <p className="text-sm text-[rgba(237,230,214,0.70)]">{session?.user?.email || '—'}</p>
+                  <p className="text-sm text-[rgba(237,230,214,0.70)]">{profile?.email || session?.user?.email || '—'}</p>
                 </div>
               </div>
 
               <div className="flex items-center justify-between gap-4 border-t border-[rgba(176,141,87,0.06)] pt-3">
                 <div>
                   <p className="font-mono text-[9px] tracking-widest uppercase text-[rgba(237,230,214,0.35)] mb-0.5">Phone</p>
-                  <p className="text-sm text-[rgba(237,230,214,0.70)]">{session?.user?.phone || 'Not added'}</p>
+                  <p className="text-sm text-[rgba(237,230,214,0.70)]">{profile?.phone || session?.user?.phone || 'Not added'}</p>
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)}>Edit</Button>
               </div>
