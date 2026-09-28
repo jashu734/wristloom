@@ -34,10 +34,11 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
     const body = await req.json();
-    const { isAvailable } = body;
+    const { isAvailable, isVerified } = body;
 
     const data: Record<string, any> = {};
     if (typeof isAvailable === 'boolean') data.isAvailable = isAvailable;
+    if (typeof isVerified === 'boolean') data.isVerified = isVerified;
 
     const updated = await db.technician.update({
       where: { id },

@@ -40,7 +40,37 @@ export async function POST(req: NextRequest) {
         razorpayOrderId: razorpay_order_id ?? null,
         razorpayPaymentId: razorpay_payment_id ?? `pay_${Date.now()}`,
       },
+      include: {
+        customer: { select: { id: true, name: true, email: true } },
+        technician: { select: { id: true, userId: true, user: { select: { name: true } } } },
+      },
     });
+
+    // Create Notification row for Customer
+    if (updated.customerId) {
+      await db.notification.create({
+        data: {
+          userId: updated.customerId,
+          bookingId: updated.id,
+          type: 'BOOKING_CONFIRMED',
+          title: 'Booking Confirmed & Deposit Received',
+          body: `Deposit of 30% received for #${updated.bookingReference} (${updated.serviceType}). Your appointment is confirmed!`,
+        },
+      }).catch((err) => console.warn('Customer notification warning:', err));
+    }
+
+    // Create Notification row for assigned Technician if any
+    if (updated.technician?.userId) {
+      await db.notification.create({
+        data: {
+          userId: updated.technician.userId,
+          bookingId: updated.id,
+          type: 'NEW_BOOKING_ASSIGNED',
+          title: 'New Confirmed Booking Assigned',
+          body: `Booking #${updated.bookingReference} has been confirmed. Scheduled for ${updated.scheduledTimeStart}.`,
+        },
+      }).catch((err) => console.warn('Technician notification warning:', err));
+    }
 
     return NextResponse.json({ success: true, booking: updated });
   } catch (err: any) {

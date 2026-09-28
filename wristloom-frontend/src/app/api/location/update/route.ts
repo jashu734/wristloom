@@ -56,6 +56,26 @@ export async function POST(req: NextRequest) {
           speed: speed || null,
         },
       });
+
+      // Broadcast location to Supabase Realtime channel for live customer radar
+      if (bookingId && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        try {
+          const { createServerClient, realtimeChannels } = await import('@/lib/supabase');
+          const supabase = createServerClient();
+          await supabase.channel(realtimeChannels.bookingLocation(bookingId)).send({
+            type: 'broadcast',
+            event: 'location_update',
+            payload: {
+              latitude,
+              longitude,
+              accuracy: accuracy || null,
+              recordedAt: new Date().toISOString(),
+            },
+          });
+        } catch (realtimeErr) {
+          console.warn('[Realtime Broadcast Warning]', realtimeErr);
+        }
+      }
     }
 
     return NextResponse.json({ success: true, latitude, longitude, technicianId });

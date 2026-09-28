@@ -40,15 +40,15 @@ export default async function ServiceTrackingPage({ params }: { params: Promise<
     );
   }
 
-  const session = await auth();
-  if (!session?.user) {
-    redirect(`/login?callbackUrl=/service-tracking/${bookingId}`);
-  }
-
   let booking = null;
   try {
-    booking = await db.repairBooking.findUnique({
-      where: { id: bookingId },
+    booking = await db.repairBooking.findFirst({
+      where: {
+        OR: [
+          { id: bookingId },
+          { bookingReference: bookingId },
+        ],
+      },
       include: {
         technician: {
           include: {
@@ -56,7 +56,7 @@ export default async function ServiceTrackingPage({ params }: { params: Promise<
           },
         },
         address: true,
-        customer: { select: { id: true, name: true } },
+        customer: { select: { id: true, name: true, email: true } },
       },
     });
   } catch (err) {
@@ -65,9 +65,17 @@ export default async function ServiceTrackingPage({ params }: { params: Promise<
 
   if (!booking) notFound();
 
-  // Security: only the booking's customer or admin can view
-  if (booking.customerId !== session.user.id && session.user.role !== 'ADMIN') {
-    redirect('/account');
+  const session = await auth();
+
+  // If customer is logged in, verify access unless admin or assigned technician
+  if (session?.user) {
+    const isOwner = booking.customerId === session.user.id;
+    const isAdmin = session.user.role === 'ADMIN';
+    const isAssignedTech = booking.technician?.userId === session.user.id;
+    const isGuestBooking = booking.customer.email.includes('guest@wristloom.luxury');
+    if (!isOwner && !isAdmin && !isAssignedTech && !isGuestBooking) {
+      redirect('/account');
+    }
   }
 
   return (
