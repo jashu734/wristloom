@@ -45,8 +45,181 @@ export function AdminTechniciansClient({ initialTechnicians }: { initialTechnici
     }
   }
 
+  const [isAdding, setIsAdding] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [newTechForm, setNewTechForm] = React.useState({
+    name: '',
+    email: '',
+    phone: '',
+    password: '',
+    specializations: 'Rolex Certified, Movement Overhauls',
+    yearsExperience: '8',
+  });
+
+  async function handleCreateTechnician(e: React.FormEvent) {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        name: newTechForm.name,
+        email: newTechForm.email,
+        phone: newTechForm.phone,
+        password: newTechForm.password,
+        specializations: newTechForm.specializations.split(',').map((s) => s.trim()).filter(Boolean),
+        yearsExperience: Number(newTechForm.yearsExperience) || 5,
+      };
+
+      const res = await fetch('/api/technicians', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error ?? 'Failed to create technician');
+      }
+
+      setTechs((prev) => [
+        {
+          id: data.technician.id,
+          user: data.user,
+          specializations: data.technician.specializations,
+          yearsExperience: data.technician.yearsExperience,
+          completedServices: 0,
+          rating: 5.0,
+          isAvailable: true,
+          isVerified: true,
+          activeJobs: 0,
+        },
+        ...prev,
+      ]);
+      setIsAdding(false);
+      setNewTechForm({
+        name: '',
+        email: '',
+        phone: '',
+        password: '',
+        specializations: 'Rolex Certified, Movement Overhauls',
+        yearsExperience: '8',
+      });
+    } catch (err: any) {
+      alert(err.message || 'Error onboarding technician');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="space-y-6">
+      <div className="flex justify-end">
+        <button
+          onClick={() => setIsAdding(true)}
+          className="font-mono text-[10px] tracking-widest uppercase px-4 py-2 bg-[#B08D57] hover:bg-[#C5A059] text-[#0E0C0A] font-semibold rounded-[2px] transition-colors"
+        >
+          + Onboard Master Horologist
+        </button>
+      </div>
+
+      {isAdding && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-[#1E1A17] border border-[rgba(176,141,87,0.25)] rounded-[2px] max-w-md w-full p-6 shadow-2xl">
+            <h2 className="font-display text-xl text-[#EDE6D6] mb-4">Onboard Master Watchmaker</h2>
+            <form onSubmit={handleCreateTechnician} className="space-y-3">
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-widest text-[#B08D57] mb-1">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Vikramaditya Rathore"
+                  value={newTechForm.name}
+                  onChange={(e) => setNewTechForm({ ...newTechForm, name: e.target.value })}
+                  className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.15)] rounded px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-widest text-[#B08D57] mb-1">Email</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="horologist@wristloom.com"
+                  value={newTechForm.email}
+                  onChange={(e) => setNewTechForm({ ...newTechForm, email: e.target.value })}
+                  className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.15)] rounded px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-mono uppercase tracking-widest text-[#B08D57] mb-1">Phone</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="+91 98765 00000"
+                    value={newTechForm.phone}
+                    onChange={(e) => setNewTechForm({ ...newTechForm, phone: e.target.value })}
+                    className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.15)] rounded px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono uppercase tracking-widest text-[#B08D57] mb-1">Temporary Password</label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Min 8 characters"
+                    value={newTechForm.password}
+                    onChange={(e) => setNewTechForm({ ...newTechForm, password: e.target.value })}
+                    className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.15)] rounded px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-mono uppercase tracking-widest text-[#B08D57] mb-1">Experience (Years)</label>
+                  <input
+                    type="number"
+                    required
+                    value={newTechForm.yearsExperience}
+                    onChange={(e) => setNewTechForm({ ...newTechForm, yearsExperience: e.target.value })}
+                    className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.15)] rounded px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono uppercase tracking-widest text-[#B08D57] mb-1">Specializations</label>
+                  <input
+                    type="text"
+                    placeholder="Rolex, Tourbillons"
+                    value={newTechForm.specializations}
+                    onChange={(e) => setNewTechForm({ ...newTechForm, specializations: e.target.value })}
+                    className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.15)] rounded px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-[rgba(176,141,87,0.10)] flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsAdding(false)}
+                  className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 text-[rgba(237,230,214,0.50)] hover:text-[#EDE6D6]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="font-mono text-[10px] uppercase tracking-widest px-4 py-2 bg-[#B08D57] text-[#0E0C0A] font-semibold rounded disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Onboarding...' : 'Confirm & Onboard'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {techs.map((t) => (
         <div key={t.id} className="bg-[#1E1A17] border border-[rgba(176,141,87,0.12)] rounded-[2px] p-6 space-y-4">
           <div className="flex items-start justify-between">
@@ -129,6 +302,7 @@ export function AdminTechniciansClient({ initialTechnicians }: { initialTechnici
           No technicians currently registered on the roster.
         </div>
       )}
+      </div>
     </div>
   );
 }
