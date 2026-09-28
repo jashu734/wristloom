@@ -41,7 +41,7 @@ export default async function AdminTechniciansPage() {
 
         <div className="container-wl py-8">
           <AdminTechniciansClient
-            initialTechnicians={technicians.map((t) => ({
+            initialTechnicians={technicians.map((t: any) => ({
               id: t.id,
               user: t.user,
               specializations: t.specializations,
@@ -50,7 +50,7 @@ export default async function AdminTechniciansPage() {
               rating: t.rating,
               isAvailable: t.isAvailable,
               isVerified: t.isVerified,
-              activeJobs: t.bookings.filter((b) => b.status !== 'COMPLETED' && b.status !== 'CANCELLED').length,
+              activeJobs: t.bookings.filter((b: any) => b.status !== 'COMPLETED' && b.status !== 'CANCELLED').length,
             }))}
           />
         </div>

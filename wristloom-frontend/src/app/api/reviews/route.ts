@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
 
     const avgRating =
       allTechReviews.length > 0
-        ? allTechReviews.reduce((sum, r) => sum + r.rating, 0) / allTechReviews.length
+        ? allTechReviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / allTechReviews.length
         : data.rating;
 
     await db.technician.update({
