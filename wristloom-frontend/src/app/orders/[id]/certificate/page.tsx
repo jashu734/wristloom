@@ -43,21 +43,24 @@ export default async function OrderCertificatePage({ params }: Props) {
 
   const session = await auth();
 
-  // Enforce ownership: only owner, matching guest email, or admin can access passport certificate
-  const isAdmin = isUserAdmin(session?.user);
-  const isOwner = Boolean(session?.user?.id && order.userId && session.user.id === order.userId);
-  const isMatchingGuest = Boolean(
-    !order.userId &&
-    session?.user?.email &&
-    order.shippingEmail &&
-    session.user.email.toLowerCase() === order.shippingEmail.toLowerCase()
-  );
+  // Enforce ownership:
+  // If order is linked to a registered user, only owner or admin can access.
+  // If order was placed as a guest, anyone holding the direct link can access.
+  if (order.userId) {
+    const isAdmin = isUserAdmin(session?.user);
+    const isOwner = Boolean(session?.user?.id && order.userId && session.user.id === order.userId);
+    const isMatchingGuest = Boolean(
+      session?.user?.email &&
+      order.shippingEmail &&
+      session.user.email.toLowerCase() === order.shippingEmail.toLowerCase()
+    );
 
-  if (!isAdmin && !isOwner && !isMatchingGuest) {
-    if (!session?.user) {
-      redirect(`/login?callbackUrl=/orders/${id}/certificate`);
+    if (!isAdmin && !isOwner && !isMatchingGuest) {
+      if (!session?.user) {
+        redirect(`/login?callbackUrl=/orders/${id}/certificate`);
+      }
+      redirect('/account');
     }
-    redirect('/account');
   }
 
   return (

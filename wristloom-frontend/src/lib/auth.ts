@@ -106,6 +106,7 @@ function CustomAuthAdapter(prisma: typeof db) {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: CustomAuthAdapter(db),
+  trustHost: true,
   session: {
     strategy: 'jwt',
     maxAge: 14 * 24 * 60 * 60, // 14-day lifetime
