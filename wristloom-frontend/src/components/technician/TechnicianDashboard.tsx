@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { signOut } from 'next-auth/react';
 import { format, isToday, isTomorrow, parseISO } from 'date-fns';
 import { Badge } from '@/components/primitives/Badge';
 import { Button } from '@/components/primitives/Button';
@@ -9,7 +10,7 @@ import { LocationTracker } from './LocationTracker';
 import {
   MapPin, Navigation, Phone, Watch, Clock, CheckCircle,
   AlertCircle, Loader2, ToggleLeft, ToggleRight, MessageCircle,
-  ShieldCheck, X, FileText, CheckCircle2,
+  ShieldCheck, X, FileText, CheckCircle2, LogOut, Bell, Camera, Upload,
 } from 'lucide-react';
 
 type BookingStatus =
@@ -39,12 +40,12 @@ interface Booking {
 }
 
 const STATUS_FLOW: { from: BookingStatus; to: BookingStatus; label: string }[] = [
-  { from: 'PENDING', to: 'CONFIRMED', label: 'Confirm Booking' },
-  { from: 'CONFIRMED', to: 'TECHNICIAN_ASSIGNED', label: 'Accept & Schedule Intake' },
-  { from: 'TECHNICIAN_ASSIGNED', to: 'TECHNICIAN_EN_ROUTE', label: "I'm On My Way" },
-  { from: 'TECHNICIAN_EN_ROUTE', to: 'TECHNICIAN_ARRIVED', label: "Watch Intake / Start Inspection" },
+  { from: 'PENDING', to: 'TECHNICIAN_EN_ROUTE', label: "I'm On My Way (En Route)" },
+  { from: 'CONFIRMED', to: 'TECHNICIAN_EN_ROUTE', label: "I'm On My Way (En Route)" },
+  { from: 'TECHNICIAN_ASSIGNED', to: 'TECHNICIAN_EN_ROUTE', label: "I'm On My Way (En Route)" },
+  { from: 'TECHNICIAN_EN_ROUTE', to: 'TECHNICIAN_ARRIVED', label: "Watch Intake / Arrived" },
   { from: 'TECHNICIAN_ARRIVED', to: 'IN_PROGRESS', label: 'Start Mechanical Restoration' },
-  { from: 'IN_PROGRESS', to: 'COMPLETED', label: 'Complete Service' },
+  { from: 'IN_PROGRESS', to: 'COMPLETED', label: 'Complete & Certify Service' },
 ];
 
 const STATUS_COLORS: Record<BookingStatus, string> = {
@@ -60,6 +61,7 @@ export function TechnicianDashboard({ userId, userName }: { userId: string; user
   const [activeBookingId, setActiveBookingId] = React.useState<string | null>(null);
   const [techId, setTechId] = React.useState<string | null>(null);
   const [activeTab, setActiveTab] = React.useState<'today' | 'upcoming' | 'completed'>('today');
+  const [newJobAlert, setNewJobAlert] = React.useState<string | null>(null);
 
   // Fetch technician profile + bookings
   React.useEffect(() => {
@@ -80,11 +82,41 @@ export function TechnicianDashboard({ userId, userName }: { userId: string; user
     load();
   }, [userId]);
 
-  async function updateStatus(bookingId: string, status: BookingStatus, notes?: string) {
+  // Real-time job polling & notification
+  React.useEffect(() => {
+    if (!techId) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/bookings');
+        if (res.ok) {
+          const fresh: Booking[] = await res.json();
+          setBookings((prev) => {
+            const prevIds = new Set(prev.map((b) => b.id));
+            const newlyAdded = fresh.filter((b) => !prevIds.has(b.id));
+            if (newlyAdded.length > 0) {
+              setNewJobAlert(`New service booking assigned: ${newlyAdded[0].watchBrand || 'Watch'} (#${newlyAdded[0].bookingReference})`);
+              setTimeout(() => setNewJobAlert(null), 8000);
+            }
+            return fresh;
+          });
+        }
+      } catch {
+        // background poll quiet
+      }
+    }, 12000);
+
+    return () => clearInterval(interval);
+  }, [techId]);
+
+  async function updateStatus(bookingId: string, status: BookingStatus, notes?: string, afterPhoto?: string) {
+    const payload: Record<string, any> = { status };
+    if (notes) payload.notes = notes;
+    if (afterPhoto) payload.serviceImages = [afterPhoto];
+
     const res = await fetch(`/api/bookings/${bookingId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, notes }),
+      body: JSON.stringify(payload),
     });
     if (res.ok) {
       const updated = await res.json();
@@ -105,9 +137,23 @@ export function TechnicianDashboard({ userId, userName }: { userId: string; user
     setIsAvailable(next);
   }
 
-  const today = bookings.filter((b) => isToday(parseISO(b.scheduledDate)) && b.status !== 'COMPLETED' && b.status !== 'CANCELLED');
-  const upcoming = bookings.filter((b) => !isToday(parseISO(b.scheduledDate)) && b.status !== 'COMPLETED' && b.status !== 'CANCELLED');
-  const completed = bookings.filter((b) => b.status === 'COMPLETED');
+  const todayBookings = bookings.filter((b) => isToday(parseISO(b.scheduledDate)));
+  const todayCompleted = todayBookings.filter((b) => b.status === 'COMPLETED').length;
+  const todayRemaining = todayBookings.filter((b) => b.status !== 'COMPLETED' && b.status !== 'CANCELLED').length;
+  const todayEarnings = todayBookings
+    .filter((b) => b.status === 'COMPLETED')
+    .reduce((sum, b: any) => sum + (b.finalPrice || b.estimatedPrice || b.depositAmount || 2500), 0);
+
+  const today = bookings
+    .filter((b) => isToday(parseISO(b.scheduledDate)) && b.status !== 'COMPLETED' && b.status !== 'CANCELLED')
+    .sort((a, b) => a.scheduledTimeStart.localeCompare(b.scheduledTimeStart));
+  const upcoming = bookings
+    .filter((b) => !isToday(parseISO(b.scheduledDate)) && b.status !== 'COMPLETED' && b.status !== 'CANCELLED')
+    .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate));
+  const completed = bookings
+    .filter((b) => b.status === 'COMPLETED')
+    .sort((a, b) => b.scheduledDate.localeCompare(a.scheduledDate));
+
   const shown = activeTab === 'today' ? today : activeTab === 'upcoming' ? upcoming : completed;
 
   if (loading) return (
@@ -123,6 +169,19 @@ export function TechnicianDashboard({ userId, userName }: { userId: string; user
         <LocationTracker bookingId={activeBookingId} technicianId={techId} />
       )}
 
+      {/* Real-time New Job Banner */}
+      {newJobAlert && (
+        <div className="bg-[#B08D57] text-[#14110F] py-2.5 px-4 text-xs font-mono flex items-center justify-between shadow-lg sticky top-0 z-30">
+          <div className="flex items-center gap-2">
+            <Bell className="w-4 h-4 animate-bounce" />
+            <span className="font-semibold">{newJobAlert}</span>
+          </div>
+          <button onClick={() => setNewJobAlert(null)} className="hover:opacity-75">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-[#1E1A17] border-b border-[rgba(176,141,87,0.10)] sticky top-0 z-20">
         <div className="container-wl py-4 flex items-center justify-between">
@@ -130,18 +189,48 @@ export function TechnicianDashboard({ userId, userName }: { userId: string; user
             <p className="font-mono text-[9px] tracking-widest uppercase text-[rgba(237,230,214,0.35)]">Technician Portal</p>
             <h1 className="font-display text-xl text-[#EDE6D6]">{userName}</h1>
           </div>
-          <button onClick={toggleAvailability} className="flex items-center gap-2 text-sm">
-            {isAvailable ? (
-              <><ToggleRight className="w-6 h-6 text-emerald-400" /><span className="text-emerald-400 font-mono text-[10px] uppercase tracking-widest">Available</span></>
-            ) : (
-              <><ToggleLeft className="w-6 h-6 text-[rgba(237,230,214,0.30)]" /><span className="text-[rgba(237,230,214,0.30)] font-mono text-[10px] uppercase tracking-widest">Offline</span></>
-            )}
-          </button>
+
+          <div className="flex items-center gap-3">
+            <button onClick={toggleAvailability} className="flex items-center gap-1.5 text-xs cursor-pointer">
+              {isAvailable ? (
+                <><ToggleRight className="w-6 h-6 text-emerald-400" /><span className="text-emerald-400 font-mono text-[10px] uppercase tracking-widest">Available</span></>
+              ) : (
+                <><ToggleLeft className="w-6 h-6 text-[rgba(237,230,214,0.30)]" /><span className="text-[rgba(237,230,214,0.30)] font-mono text-[10px] uppercase tracking-widest">Offline</span></>
+              )}
+            </button>
+
+            <button
+              onClick={() => signOut({ callbackUrl: '/login' })}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[2px] border border-[rgba(176,141,87,0.25)] text-[rgba(237,230,214,0.60)] hover:text-[#EDE6D6] hover:border-[#B08D57] transition-colors text-xs font-mono cursor-pointer"
+              title="Sign out of technician portal"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Sign Out</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Today's Summary Strip */}
+        <div className="bg-[#14110F] border-t border-b border-[rgba(176,141,87,0.08)] py-2.5">
+          <div className="container-wl grid grid-cols-3 gap-3 text-center">
+            <div className="bg-[#1E1A17] p-2 rounded-[2px] border border-[rgba(176,141,87,0.08)]">
+              <span className="font-mono text-base text-emerald-400 font-semibold">{todayCompleted}</span>
+              <p className="font-mono text-[8px] uppercase tracking-widest text-[rgba(237,230,214,0.35)]">Completed Today</p>
+            </div>
+            <div className="bg-[#1E1A17] p-2 rounded-[2px] border border-[rgba(176,141,87,0.08)]">
+              <span className="font-mono text-base text-amber-400 font-semibold">{todayRemaining}</span>
+              <p className="font-mono text-[8px] uppercase tracking-widest text-[rgba(237,230,214,0.35)]">Remaining Today</p>
+            </div>
+            <div className="bg-[#1E1A17] p-2 rounded-[2px] border border-[rgba(176,141,87,0.08)]">
+              <span className="font-mono text-base text-[#B08D57] font-semibold">₹{todayEarnings.toLocaleString('en-IN')}</span>
+              <p className="font-mono text-[8px] uppercase tracking-widest text-[rgba(237,230,214,0.35)]">Today&apos;s Value</p>
+            </div>
+          </div>
         </div>
 
         {/* Tabs */}
-        <div className="container-wl pb-3 flex gap-1">
-          {([['today', `Today (${today.length})`], ['upcoming', `Upcoming (${upcoming.length})`], ['completed', 'Completed']] as const).map(([id, label]) => (
+        <div className="container-wl py-2.5 flex gap-1">
+          {([['today', `Today (${today.length})`], ['upcoming', `Upcoming (${upcoming.length})`], ['completed', `Completed (${completed.length})`]] as const).map(([id, label]) => (
             <button key={id} onClick={() => setActiveTab(id)}
               className={`font-mono text-[10px] tracking-widest uppercase px-3 py-1.5 rounded-[2px] transition-colors ${activeTab === id ? 'bg-[rgba(176,141,87,0.12)] text-[#B08D57] border border-[rgba(176,141,87,0.25)]' : 'text-[rgba(237,230,214,0.35)] hover:text-[#EDE6D6]'}`}>
               {label}
@@ -168,12 +257,16 @@ export function TechnicianDashboard({ userId, userName }: { userId: string; user
   );
 }
 
-function BookingCard({ booking, onUpdateStatus }: { booking: Booking; onUpdateStatus: (id: string, s: BookingStatus, notes?: string) => Promise<void> | void }) {
+function BookingCard({ booking, onUpdateStatus }: { booking: Booking; onUpdateStatus: (id: string, s: BookingStatus, notes?: string, afterPhoto?: string) => Promise<void> | void }) {
   const [updating, setUpdating] = React.useState(false);
   const [showCompletionModal, setShowCompletionModal] = React.useState(false);
   const [completionNotes, setCompletionNotes] = React.useState(
     `Movement inspected and regulated. Escapement lubricated with synthetic oils, water-resistance seals verified.`
   );
+  const [completionPhoto, setCompletionPhoto] = React.useState<string | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = React.useState(false);
+  const [photoError, setPhotoError] = React.useState<string | null>(null);
+
   const [otpInput, setOtpInput] = React.useState('');
   const [otpError, setOtpError] = React.useState<string | null>(null);
 
@@ -185,6 +278,30 @@ function BookingCard({ booking, onUpdateStatus }: { booking: Booking; onUpdateSt
 
   // Expected 4-digit verification code from reference
   const expectedPin = booking.bookingReference.slice(-4).toUpperCase();
+
+  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingPhoto(true);
+    setPhotoError(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to upload photo');
+      }
+      setCompletionPhoto(data.url);
+    } catch (err: any) {
+      setPhotoError(err.message || 'Photo upload failed');
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  }
 
   async function handlePostProgressNote() {
     if (!progressNote.trim()) return;
@@ -222,6 +339,7 @@ function BookingCard({ booking, onUpdateStatus }: { booking: Booking; onUpdateSt
   async function handleConfirmCompletion(e: React.FormEvent) {
     e.preventDefault();
     setOtpError(null);
+    setPhotoError(null);
 
     const enteredClean = otpInput.trim().toUpperCase();
     if (enteredClean && enteredClean !== expectedPin) {
@@ -229,8 +347,17 @@ function BookingCard({ booking, onUpdateStatus }: { booking: Booking; onUpdateSt
       return;
     }
 
+    if (!completionPhoto) {
+      setPhotoError('Please upload at least one after-service photo to verify completed work.');
+      return;
+    }
+
+    if (!completionNotes.trim()) {
+      return;
+    }
+
     setUpdating(true);
-    await onUpdateStatus(booking.id, 'COMPLETED', completionNotes.trim());
+    await onUpdateStatus(booking.id, 'COMPLETED', completionNotes.trim(), completionPhoto);
     setShowCompletionModal(false);
     setUpdating(false);
   }
@@ -440,6 +567,40 @@ function BookingCard({ booking, onUpdateStatus }: { booking: Booking; onUpdateSt
                   placeholder="Describe parts replaced, calibration tolerances, regulation..."
                   required
                 />
+              </div>
+
+              <div>
+                <label className="block font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.50)] mb-1.5">
+                  After-Service Quality Photo *
+                </label>
+                {completionPhoto ? (
+                  <div className="relative rounded border border-[#B08D57]/40 overflow-hidden aspect-video bg-black flex items-center justify-center">
+                    <img src={completionPhoto} alt="Completed watch" className="w-full h-full object-contain" />
+                    <button
+                      type="button"
+                      onClick={() => setCompletionPhoto(null)}
+                      className="absolute top-2 right-2 bg-black/70 text-white p-1 rounded-full hover:bg-black"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="border border-dashed border-[rgba(176,141,87,0.30)] hover:border-[#B08D57] rounded p-4 flex flex-col items-center justify-center cursor-pointer bg-[#14110F] text-center">
+                    <Upload className="w-5 h-5 text-[#B08D57] mb-1" />
+                    <span className="text-xs text-[rgba(237,230,214,0.70)]">
+                      {isUploadingPhoto ? 'Uploading photo...' : 'Click to upload completed watch photo'}
+                    </span>
+                    <span className="text-[10px] text-[rgba(237,230,214,0.40)] mt-0.5">JPEG, PNG or WEBP up to 10MB</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isUploadingPhoto}
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+                {photoError && <p className="text-xs text-red-400 mt-1 font-mono">{photoError}</p>}
               </div>
 
               <div>

@@ -140,14 +140,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           actualRole = 'ADMIN';
         }
 
-        const intendedRole = credentials.intendedRole as string | undefined;
-        if (intendedRole === 'TECHNICIAN' && actualRole !== 'TECHNICIAN' && actualRole !== 'ADMIN') {
-          throw new Error('NOT_A_TECHNICIAN');
-        }
-        if (intendedRole === 'CUSTOMER' && actualRole === 'TECHNICIAN') {
-          throw new Error('IS_A_TECHNICIAN');
-        }
-
         return {
           id: user.id,
           name: user.name,

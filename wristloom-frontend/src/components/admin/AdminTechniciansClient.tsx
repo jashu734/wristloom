@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Star, ShieldCheck, ShieldAlert, Loader2 } from 'lucide-react';
+import { Star, ShieldCheck, ShieldAlert, Loader2, Edit2, X } from 'lucide-react';
 
 interface TechItem {
   id: string;
@@ -23,6 +23,84 @@ interface TechItem {
 export function AdminTechniciansClient({ initialTechnicians }: { initialTechnicians: TechItem[] }) {
   const [techs, setTechs] = React.useState<TechItem[]>(initialTechnicians);
   const [loadingId, setLoadingId] = React.useState<string | null>(null);
+
+  // Edit Technician State
+  const [editingTech, setEditingTech] = React.useState<TechItem | null>(null);
+  const [editForm, setEditForm] = React.useState({
+    name: '',
+    phone: '',
+    specializations: '',
+    yearsExperience: '5',
+    isAvailable: true,
+    isVerified: true,
+  });
+  const [isEditingSubmitting, setIsEditingSubmitting] = React.useState(false);
+  const [editError, setEditError] = React.useState<string | null>(null);
+
+  function openEdit(tech: TechItem) {
+    setEditingTech(tech);
+    setEditForm({
+      name: tech.user.name || '',
+      phone: tech.user.phone || '',
+      specializations: tech.specializations.join(', '),
+      yearsExperience: String(tech.yearsExperience),
+      isAvailable: tech.isAvailable,
+      isVerified: tech.isVerified,
+    });
+    setEditError(null);
+  }
+
+  async function handleUpdateTechnician(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingTech) return;
+    setIsEditingSubmitting(true);
+    setEditError(null);
+    try {
+      const payload = {
+        name: editForm.name,
+        phone: editForm.phone,
+        specializations: editForm.specializations.split(',').map((s) => s.trim()).filter(Boolean),
+        yearsExperience: Number(editForm.yearsExperience) || 0,
+        isAvailable: editForm.isAvailable,
+        isVerified: editForm.isVerified,
+      };
+
+      const res = await fetch(`/api/technicians/${editingTech.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const updated = await res.json();
+      if (!res.ok) {
+        throw new Error(updated.error || 'Failed to update technician');
+      }
+
+      setTechs((prev) =>
+        prev.map((t) =>
+          t.id === editingTech.id
+            ? {
+                ...t,
+                user: {
+                  ...t.user,
+                  name: updated.user?.name ?? payload.name,
+                  phone: updated.user?.phone ?? payload.phone,
+                },
+                specializations: updated.specializations ?? payload.specializations,
+                yearsExperience: updated.yearsExperience ?? payload.yearsExperience,
+                isAvailable: updated.isAvailable,
+                isVerified: updated.isVerified,
+              }
+            : t
+        )
+      );
+      setEditingTech(null);
+    } catch (err: any) {
+      setEditError(err.message || 'Failed to update technician');
+    } finally {
+      setIsEditingSubmitting(false);
+    }
+  }
 
   async function toggleStatus(id: string, field: 'isAvailable' | 'isVerified', currentValue: boolean) {
     setLoadingId(id);
@@ -219,6 +297,117 @@ export function AdminTechniciansClient({ initialTechnicians }: { initialTechnici
         </div>
       )}
 
+      {/* Edit Technician Modal */}
+      {editingTech && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#1E1A17] border border-[rgba(176,141,87,0.30)] rounded-[2px] max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[rgba(176,141,87,0.15)]">
+              <h2 className="font-display text-lg text-[#EDE6D6]">Edit Master Technician</h2>
+              <button onClick={() => setEditingTech(null)} className="text-[rgba(237,230,214,0.40)] hover:text-[#EDE6D6]">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {editError && (
+              <div className="p-3 bg-red-950/40 border border-red-800/50 rounded text-red-300 text-xs font-mono">
+                {editError}
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateTechnician} className="space-y-3">
+              <div>
+                <label className="font-mono text-[10px] uppercase tracking-widest text-[rgba(237,230,214,0.50)] block mb-1">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.20)] text-[#EDE6D6] px-3 py-2 text-sm rounded focus:border-[#B08D57] focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="font-mono text-[10px] uppercase tracking-widest text-[rgba(237,230,214,0.50)] block mb-1">
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                  className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.20)] text-[#EDE6D6] px-3 py-2 text-sm rounded focus:border-[#B08D57] focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="font-mono text-[10px] uppercase tracking-widest text-[rgba(237,230,214,0.50)] block mb-1">
+                  Specializations (comma separated)
+                </label>
+                <input
+                  type="text"
+                  value={editForm.specializations}
+                  onChange={(e) => setEditForm({ ...editForm, specializations: e.target.value })}
+                  className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.20)] text-[#EDE6D6] px-3 py-2 text-sm rounded focus:border-[#B08D57] focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="font-mono text-[10px] uppercase tracking-widest text-[rgba(237,230,214,0.50)] block mb-1">
+                  Years of Experience
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="60"
+                  value={editForm.yearsExperience}
+                  onChange={(e) => setEditForm({ ...editForm, yearsExperience: e.target.value })}
+                  className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.20)] text-[#EDE6D6] px-3 py-2 text-sm rounded focus:border-[#B08D57] focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <label className="flex items-center gap-2 text-xs font-mono text-[#EDE6D6] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editForm.isAvailable}
+                    onChange={(e) => setEditForm({ ...editForm, isAvailable: e.target.checked })}
+                    className="accent-[#B08D57]"
+                  />
+                  <span>Available</span>
+                </label>
+                <label className="flex items-center gap-2 text-xs font-mono text-[#EDE6D6] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editForm.isVerified}
+                    onChange={(e) => setEditForm({ ...editForm, isVerified: e.target.checked })}
+                    className="accent-[#B08D57]"
+                  />
+                  <span>Verified</span>
+                </label>
+              </div>
+
+              <div className="pt-3 border-t border-[rgba(176,141,87,0.10)] flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditingTech(null)}
+                  className="font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 text-[rgba(237,230,214,0.50)] hover:text-[#EDE6D6]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isEditingSubmitting}
+                  className="font-mono text-[10px] uppercase tracking-widest px-4 py-2 bg-[#B08D57] text-[#0E0C0A] font-semibold rounded disabled:opacity-50"
+                >
+                  {isEditingSubmitting ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {techs.map((t) => (
         <div key={t.id} className="bg-[#1E1A17] border border-[rgba(176,141,87,0.12)] rounded-[2px] p-6 space-y-4">
@@ -228,9 +417,19 @@ export function AdminTechniciansClient({ initialTechnicians }: { initialTechnici
               <p className="text-xs text-[rgba(237,230,214,0.45)]">{t.user.email}</p>
               <p className="font-mono text-[11px] text-[#B08D57] mt-0.5">{t.user.phone || '—'}</p>
             </div>
-            <div className="flex items-center gap-1 font-mono text-sm text-[#B08D57]">
-              <Star className="w-3.5 h-3.5 fill-[#B08D57] text-[#B08D57]" />
-              {t.rating.toFixed(2)}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => openEdit(t)}
+                className="p-1.5 text-[rgba(237,230,214,0.40)] hover:text-[#B08D57] transition-colors rounded hover:bg-[rgba(176,141,87,0.10)]"
+                title="Edit technician details"
+              >
+                <Edit2 className="w-3.5 h-3.5" />
+              </button>
+              <div className="flex items-center gap-1 font-mono text-sm text-[#B08D57]">
+                <Star className="w-3.5 h-3.5 fill-[#B08D57] text-[#B08D57]" />
+                {t.rating.toFixed(2)}
+              </div>
             </div>
           </div>
 
@@ -270,6 +469,15 @@ export function AdminTechniciansClient({ initialTechnicians }: { initialTechnici
             >
               {loadingId === t.id && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
               {t.isAvailable ? 'Available' : 'Offline'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => openEdit(t)}
+              className="font-mono text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-[1px] border border-[rgba(176,141,87,0.25)] text-[#B08D57] hover:bg-[rgba(176,141,87,0.10)] transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              <Edit2 className="w-2.5 h-2.5" />
+              <span>Edit</span>
             </button>
 
             <button

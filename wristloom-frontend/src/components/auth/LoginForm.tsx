@@ -83,20 +83,43 @@ export function LoginForm() {
         return;
       }
 
-      // Step 3: Redirect to destination based on verified database role
-      let destination = verifyData.redirectUrl;
-      if (!destination) {
-        if (verifyData.role === 'ADMIN') {
+      // Step 3: Determine authoritative destination with safe callbackUrl resolution
+      const rawCallback = searchParams.get('callbackUrl');
+      let destination: string;
+
+      // Check if callbackUrl is a safe internal relative path
+      const isInternalCallback =
+        rawCallback &&
+        rawCallback.startsWith('/') &&
+        !rawCallback.startsWith('//') &&
+        !rawCallback.startsWith('/login') &&
+        !rawCallback.startsWith('/register');
+
+      const userRole = verifyData.role;
+
+      if (isInternalCallback) {
+        if (userRole === 'ADMIN') {
+          destination = rawCallback;
+        } else if (userRole === 'TECHNICIAN') {
+          destination = rawCallback.startsWith('/admin') ? '/technician/dashboard' : rawCallback;
+        } else {
+          destination =
+            rawCallback.startsWith('/admin') || rawCallback.startsWith('/technician')
+              ? '/customer/dashboard'
+              : rawCallback;
+        }
+      } else {
+        if (userRole === 'ADMIN') {
           destination = '/admin/dashboard';
-        } else if (verifyData.role === 'TECHNICIAN') {
+        } else if (userRole === 'TECHNICIAN') {
           destination = '/technician/dashboard';
         } else {
           destination = '/customer/dashboard';
         }
       }
 
-      router.push(destination);
-      router.refresh();
+      // Full navigation ensures set-cookie headers are committed before page load
+      window.location.href = destination;
     } catch (err: any) {
       console.error('[Login Submission Error]', err);
       setServerError('A network error occurred. Please check your connection and try again.');

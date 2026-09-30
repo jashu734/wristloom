@@ -35,6 +35,7 @@ const patchSchema = z.object({
   finalPrice: z.number().positive().optional(),
   paymentStatus: z.enum(['UNPAID', 'DEPOSIT_PAID', 'FULLY_PAID', 'REFUNDED']).optional(),
   scheduledDate: z.string().optional(),
+  serviceImages: z.array(z.string()).optional(),
 });
 
 export async function GET(req: NextRequest, context: RouteContext) {
@@ -166,6 +167,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
 
     if (body.status) data.status = body.status;
     if (body.notes !== undefined) data.notes = body.notes;
+    if (body.serviceImages !== undefined) data.serviceImages = body.serviceImages;
 
     if (isAdmin) {
       if (body.technicianId) data.technicianId = body.technicianId;

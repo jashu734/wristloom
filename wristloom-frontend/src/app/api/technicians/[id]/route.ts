@@ -89,8 +89,23 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     }
 
     const body = await req.json();
-    const { isAvailable, isVerified } = body;
+    const { name, phone, specializations, yearsExperience, bio, serviceRadiusKm, isAvailable, isVerified } = body;
 
+    // 1. Update user fields (name, phone) if provided and authorized
+    if (name !== undefined || phone !== undefined) {
+      const userUpdate: Record<string, any> = {};
+      if (typeof name === 'string' && name.trim()) userUpdate.name = name.trim();
+      if (typeof phone === 'string') userUpdate.phone = phone.trim();
+
+      if (Object.keys(userUpdate).length > 0) {
+        await db.user.update({
+          where: { id: tech.userId },
+          data: userUpdate,
+        });
+      }
+    }
+
+    // 2. Update technician profile fields
     const data: Record<string, any> = {};
     if (typeof isAvailable === 'boolean') data.isAvailable = isAvailable;
     if (typeof isVerified === 'boolean') {
@@ -100,9 +115,39 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       data.isVerified = isVerified;
     }
 
+    if (specializations !== undefined) {
+      if (Array.isArray(specializations)) {
+        data.specializations = specializations.map((s) => String(s).trim()).filter(Boolean);
+      } else if (typeof specializations === 'string') {
+        data.specializations = specializations.split(',').map((s) => s.trim()).filter(Boolean);
+      }
+    }
+
+    if (yearsExperience !== undefined) {
+      data.yearsExperience = Number(yearsExperience) || 0;
+    }
+
+    if (bio !== undefined && typeof bio === 'string') {
+      data.bio = bio.trim();
+    }
+
+    if (serviceRadiusKm !== undefined) {
+      data.serviceRadiusKm = Number(serviceRadiusKm) || 25;
+    }
+
     const updated = await db.technician.update({
       where: { id },
       data,
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true,
+            phone: true,
+            profileImage: true,
+          },
+        },
+      },
     });
 
     return NextResponse.json(updated);

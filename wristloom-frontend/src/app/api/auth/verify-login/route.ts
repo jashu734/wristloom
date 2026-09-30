@@ -80,47 +80,20 @@ export async function POST(req: NextRequest) {
       actualRole = 'ADMIN';
     }
 
-    // Role verification against database authority
+    // Authoritative role from database
+    let redirectUrl = '/customer/dashboard';
     if (actualRole === 'ADMIN') {
-      return NextResponse.json({
-        success: true,
-        role: 'ADMIN',
-        redirectUrl: '/admin/dashboard',
-      });
-    }
-
-    if (intendedRole === 'TECHNICIAN') {
-      if (actualRole !== 'TECHNICIAN') {
-        return NextResponse.json(
-          { error: 'This account is not registered as a technician.' },
-          { status: 403 }
-        );
-      }
-      return NextResponse.json({
-        success: true,
-        role: 'TECHNICIAN',
-        redirectUrl: '/technician/dashboard',
-      });
-    }
-
-    if (intendedRole === 'CUSTOMER') {
-      if (actualRole === 'TECHNICIAN') {
-        return NextResponse.json(
-          { error: 'This account is registered as a technician. Please select Technician to sign in.' },
-          { status: 403 }
-        );
-      }
-      return NextResponse.json({
-        success: true,
-        role: 'CUSTOMER',
-        redirectUrl: '/customer/dashboard',
-      });
+      redirectUrl = '/admin/dashboard';
+    } else if (actualRole === 'TECHNICIAN') {
+      redirectUrl = '/technician/dashboard';
+    } else {
+      redirectUrl = '/customer/dashboard';
     }
 
     return NextResponse.json({
       success: true,
       role: actualRole,
-      redirectUrl: '/customer/dashboard',
+      redirectUrl,
     });
   } catch (error: any) {
     console.error('[Verify Login Error]', error);
