@@ -8,6 +8,49 @@ const nextConfig: NextConfig = {
     root: path.resolve(__dirname),
   },
 
+  // Remote image optimization domains
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.supabase.co',
+        pathname: '/**',
+      },
+    ],
+  },
+
+  // Security Headers
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'SAMEORIGIN',
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(self)',
+          },
+        ],
+      },
+    ];
+  },
+
   // Allow dev access from local network (e.g. phone/tablet testing)
   allowedDevOrigins: ['192.168.56.1', '192.168.1.*', '10.0.0.*'],
 };

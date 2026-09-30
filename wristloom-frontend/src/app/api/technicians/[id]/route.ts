@@ -13,16 +13,52 @@ interface RouteContext {
 
 export async function GET(req: NextRequest, context: RouteContext) {
   try {
+    const session = await auth();
     const { id } = await context.params;
+
     const tech = await db.technician.findUnique({
       where: { id },
-      include: {
-        user: { select: { name: true, email: true, phone: true, profileImage: true } },
+      select: {
+        id: true,
+        userId: true,
+        bio: true,
+        yearsExperience: true,
+        specializations: true,
+        certifications: true,
+        brandsServiced: true,
+        rating: true,
+        completedServices: true,
+        serviceRadiusKm: true,
+        isVerified: true,
+        isAvailable: true,
+        currentLatitude: true,
+        currentLongitude: true,
+        createdAt: true,
+        user: {
+          select: {
+            name: true,
+            profileImage: true,
+            email: session?.user?.role === 'ADMIN',
+            phone: session?.user?.role === 'ADMIN',
+          },
+        },
       },
     });
 
     if (!tech) {
       return NextResponse.json({ error: 'Technician not found' }, { status: 404 });
+    }
+
+    // Allow technician themselves to see their own contact details
+    if (session?.user?.id === tech.userId) {
+      const fullUser = await db.user.findUnique({
+        where: { id: tech.userId },
+        select: { email: true, phone: true },
+      });
+      if (fullUser) {
+        (tech.user as any).email = fullUser.email;
+        (tech.user as any).phone = fullUser.phone;
+      }
     }
 
     return NextResponse.json(tech);

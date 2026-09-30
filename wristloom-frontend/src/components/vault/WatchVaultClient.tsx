@@ -17,8 +17,10 @@ import {
   ChevronUp,
   Wrench,
   Calendar,
+  ShoppingBag,
 } from 'lucide-react';
 import Link from 'next/link';
+import { WATCH_BRANDS } from '@/lib/constants';
 
 // ─── Watch Vault Client ───────────────────────────────────────
 export function WatchVaultClient() {
@@ -60,7 +62,7 @@ export function WatchVaultClient() {
 
   // New watch form state
   const [newWatch, setNewWatch] = React.useState({
-    brand: 'Rolex',
+    brand: WATCH_BRANDS[0] as string,
     watch_name: '',
     reference_number: '',
     movement: 'Automatic',
@@ -119,7 +121,7 @@ export function WatchVaultClient() {
       setSelected(newItem.id);
       setIsAddModalOpen(false);
       setNewWatch({
-        brand: 'Rolex',
+        brand: WATCH_BRANDS[0],
         watch_name: '',
         reference_number: '',
         movement: 'Automatic',
@@ -158,20 +160,28 @@ export function WatchVaultClient() {
       {/* ─── Vault Header ──────────────────────────────── */}
       <div className="bg-[#1E1A17] border-b border-[rgba(176,141,87,0.10)]">
         <div className="container-wl py-8">
-          <div className="flex items-start justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div>
-              <span className="text-overline block mb-2">Your Collection</span>
+              <span className="text-overline block mb-2">Personal Collection</span>
               <h1 className="font-display text-3xl md:text-4xl text-[#EDE6D6] tracking-tight">
                 Watch Vault
               </h1>
               <p className="text-sm text-[rgba(237,230,214,0.50)] mt-1">
-                {items.length} {items.length === 1 ? 'timepiece' : 'timepieces'} · Personal collection
+                {items.length} {items.length === 1 ? 'timepiece' : 'timepieces'} · Horological health & service records
               </p>
             </div>
-            <Button variant="primary" size="sm" onClick={() => setIsAddModalOpen(true)}>
-              <Plus className="w-4 h-4" />
-              Add Watch
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button variant="subtle" size="sm" onClick={() => setIsAddModalOpen(true)}>
+                <Plus className="w-4 h-4 mr-1.5" />
+                Register Owned Watch
+              </Button>
+              <Button variant="primary" size="sm" asChild>
+                <Link href="/shop" className="flex items-center gap-1.5">
+                  <ShoppingBag className="w-4 h-4" />
+                  <span>Browse Watch Shop</span>
+                </Link>
+              </Button>
+            </div>
           </div>
 
           {/* Collection health summary */}
@@ -194,9 +204,9 @@ export function WatchVaultClient() {
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="bg-[#1E1A17] border border-[rgba(176,141,87,0.30)] rounded-[2px] p-6 max-w-lg w-full shadow-2xl relative">
-            <h2 className="font-display text-2xl text-[#EDE6D6] mb-1">Add to Watch Vault</h2>
+            <h2 className="font-display text-2xl text-[#EDE6D6] mb-1">Register Owned Timepiece</h2>
             <p className="text-xs text-[rgba(237,230,214,0.50)] mb-6">
-              Register a new timepiece into your secure horological ledger.
+              Log a watch from your personal collection for servicing, warranty records, and maintenance history. (To purchase watches, visit the Boutique Shop).
             </p>
 
             <form onSubmit={handleAddWatch} className="space-y-4">
@@ -205,13 +215,18 @@ export function WatchVaultClient() {
                   <label className="block font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.45)] mb-1">
                     Brand *
                   </label>
-                  <input
-                    type="text"
+                  <select
                     required
                     value={newWatch.brand}
                     onChange={(e) => setNewWatch({ ...newWatch, brand: e.target.value })}
                     className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.20)] rounded-[2px] px-3 py-2 text-sm text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
-                  />
+                  >
+                    {WATCH_BRANDS.map((b) => (
+                      <option key={b} value={b}>
+                        {b}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.45)] mb-1">
@@ -220,7 +235,7 @@ export function WatchVaultClient() {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Submariner Date"
+                    placeholder="e.g. Presage Cocktail Time"
                     value={newWatch.watch_name}
                     onChange={(e) => setNewWatch({ ...newWatch, watch_name: e.target.value })}
                     className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.20)] rounded-[2px] px-3 py-2 text-sm text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
@@ -235,10 +250,10 @@ export function WatchVaultClient() {
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. 126610LN"
+                    placeholder="e.g. SRPB43J1"
                     value={newWatch.reference_number}
                     onChange={(e) => setNewWatch({ ...newWatch, reference_number: e.target.value })}
-                    className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.20)] rounded-[2px] px-3 py-2 text-sm text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
+                    className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.20)] rounded-[2px] px-3 py-2 text-sm text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none font-mono"
                   />
                 </div>
                 <div>
@@ -337,12 +352,12 @@ export function WatchVaultClient() {
                     aria-pressed={selected === item.id}
                   >
                     {/* Thumbnail */}
-                    <div className="w-14 h-14 flex-shrink-0 rounded-[2px] overflow-hidden bg-[#14110F]">
+                    <div className="w-14 h-14 flex-shrink-0 rounded-[2px] overflow-hidden bg-[#14110F] p-1 flex items-center justify-center">
                       {item.photo_urls[0] ? (
                         <img
                           src={item.photo_urls[0]}
                           alt={item.watch_name}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-contain"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
@@ -391,12 +406,12 @@ function WatchDetailPanel({ item }: { item: VaultItem }) {
 
         <div className="relative z-10 p-6 flex flex-col sm:flex-row gap-6">
           {/* Watch image */}
-          <div className="w-full sm:w-48 flex-shrink-0 aspect-square rounded-[2px] overflow-hidden bg-[#14110F]">
+          <div className="w-full sm:w-48 flex-shrink-0 aspect-square rounded-[2px] overflow-hidden bg-[#14110F] p-4 flex items-center justify-center border border-[rgba(176,141,87,0.15)]">
             {item.photo_urls[0] ? (
               <img
                 src={item.photo_urls[0]}
                 alt={item.watch_name}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">

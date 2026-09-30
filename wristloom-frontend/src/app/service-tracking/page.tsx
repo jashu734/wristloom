@@ -3,12 +3,23 @@ import Link from 'next/link';
 import { ServiceTrackingSearch } from '../../components/tracking/ServiceTrackingSearch';
 import { ShieldCheck, MapPin, Clock, Award, ArrowRight } from 'lucide-react';
 
+import { redirect } from 'next/navigation';
+
 export const metadata: Metadata = {
   title: 'Live Service Tracking | Wristloom Atelier',
   description: 'Track your luxury watch service, white-glove courier, or horologist appointment in real time.',
 };
 
-export default function ServiceTrackingLandingPage() {
+export default async function ServiceTrackingLandingPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ id?: string; ref?: string; bookingId?: string }>;
+}) {
+  const sp = searchParams ? await searchParams : {};
+  const targetId = sp.id || sp.ref || sp.bookingId;
+  if (targetId) {
+    redirect(`/service-tracking/${targetId}`);
+  }
   return (
     <div className="min-h-screen bg-[#0E0C0A] text-[#EDE6D6] pt-28 pb-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">

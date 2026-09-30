@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { SiteWrapper } from '@/components/layout/SiteWrapper';
 
 export const metadata: Metadata = {
@@ -85,12 +86,12 @@ export default function WatchCarePage() {
             <p className="text-sm text-[rgba(237,230,214,0.55)] max-w-md mx-auto mb-6">
               Our certified technicians can visit your home to inspect your collection, assess health status, and advise on priority service needs.
             </p>
-            <a
+            <Link
               href="/services/repair"
               className="inline-flex items-center font-mono text-[11px] tracking-widest uppercase px-6 py-3 border border-[rgba(176,141,87,0.30)] text-[#B08D57] hover:bg-[rgba(176,141,87,0.08)] rounded-[2px] transition-colors"
             >
               Book a House Call
-            </a>
+            </Link>
           </div>
         </div>
       </div>

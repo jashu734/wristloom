@@ -8,29 +8,36 @@ import { auth } from '@/lib/auth';
 export async function POST(req: NextRequest) {
   try {
     const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized: Authentication required' }, { status: 401 });
+    }
+
     const body = await req.json();
     const { bookingId, latitude, longitude, accuracy, heading, speed } = body;
 
-    if (latitude === undefined || longitude === undefined) {
-      return NextResponse.json({ error: 'latitude and longitude are required' }, { status: 400 });
+    if (
+      typeof latitude !== 'number' ||
+      typeof longitude !== 'number' ||
+      latitude < -90 ||
+      latitude > 90 ||
+      longitude < -180 ||
+      longitude > 180
+    ) {
+      return NextResponse.json({ error: 'Valid latitude (-90 to 90) and longitude (-180 to 180) are required' }, { status: 400 });
     }
 
-    // Try to find technician linked to current user or active booking
+    // Identify the technician
     let technicianId: string | null = null;
-    if (session?.user?.id) {
-      const tech = await db.technician.findUnique({ where: { userId: session.user.id } });
-      if (tech) technicianId = tech.id;
-    }
-
-    if (!technicianId && bookingId) {
+    const tech = await db.technician.findUnique({ where: { userId: session.user.id } });
+    if (tech) {
+      technicianId = tech.id;
+    } else if (session.user.role === 'ADMIN' && bookingId) {
       const booking = await db.repairBooking.findUnique({ where: { id: bookingId } });
       technicianId = booking?.technicianId ?? null;
     }
 
     if (!technicianId) {
-      // Find default technician
-      const firstTech = await db.technician.findFirst();
-      technicianId = firstTech?.id ?? null;
+      return NextResponse.json({ error: 'Forbidden: Only active technicians can report location' }, { status: 403 });
     }
 
     if (technicianId) {

@@ -8,7 +8,8 @@ import { Button } from '@/components/primitives/Button';
 import { LocationTracker } from './LocationTracker';
 import {
   MapPin, Navigation, Phone, Watch, Clock, CheckCircle,
-  AlertCircle, Loader2, ToggleLeft, ToggleRight,
+  AlertCircle, Loader2, ToggleLeft, ToggleRight, MessageCircle,
+  ShieldCheck, X, FileText, CheckCircle2,
 } from 'lucide-react';
 
 type BookingStatus =
@@ -38,9 +39,11 @@ interface Booking {
 }
 
 const STATUS_FLOW: { from: BookingStatus; to: BookingStatus; label: string }[] = [
+  { from: 'PENDING', to: 'CONFIRMED', label: 'Confirm Booking' },
+  { from: 'CONFIRMED', to: 'TECHNICIAN_ASSIGNED', label: 'Accept & Schedule Intake' },
   { from: 'TECHNICIAN_ASSIGNED', to: 'TECHNICIAN_EN_ROUTE', label: "I'm On My Way" },
-  { from: 'TECHNICIAN_EN_ROUTE', to: 'TECHNICIAN_ARRIVED', label: 'I\'ve Arrived' },
-  { from: 'TECHNICIAN_ARRIVED', to: 'IN_PROGRESS', label: 'Start Service' },
+  { from: 'TECHNICIAN_EN_ROUTE', to: 'TECHNICIAN_ARRIVED', label: "Watch Intake / Start Inspection" },
+  { from: 'TECHNICIAN_ARRIVED', to: 'IN_PROGRESS', label: 'Start Mechanical Restoration' },
   { from: 'IN_PROGRESS', to: 'COMPLETED', label: 'Complete Service' },
 ];
 
@@ -77,11 +80,11 @@ export function TechnicianDashboard({ userId, userName }: { userId: string; user
     load();
   }, [userId]);
 
-  async function updateStatus(bookingId: string, status: BookingStatus) {
+  async function updateStatus(bookingId: string, status: BookingStatus, notes?: string) {
     const res = await fetch(`/api/bookings/${bookingId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, notes }),
     });
     if (res.ok) {
       const updated = await res.json();
@@ -165,116 +168,322 @@ export function TechnicianDashboard({ userId, userName }: { userId: string; user
   );
 }
 
-function BookingCard({ booking, onUpdateStatus }: { booking: Booking; onUpdateStatus: (id: string, s: BookingStatus) => void }) {
+function BookingCard({ booking, onUpdateStatus }: { booking: Booking; onUpdateStatus: (id: string, s: BookingStatus, notes?: string) => Promise<void> | void }) {
   const [updating, setUpdating] = React.useState(false);
+  const [showCompletionModal, setShowCompletionModal] = React.useState(false);
+  const [completionNotes, setCompletionNotes] = React.useState(
+    `Movement inspected and regulated. Escapement lubricated with synthetic oils, water-resistance seals verified.`
+  );
+  const [otpInput, setOtpInput] = React.useState('');
+  const [otpError, setOtpError] = React.useState<string | null>(null);
+
+  const [progressNote, setProgressNote] = React.useState('');
+  const [isSubmittingNote, setIsSubmittingNote] = React.useState(false);
+  const [noteSuccess, setNoteSuccess] = React.useState(false);
+
   const nextAction = STATUS_FLOW.find((f) => f.from === booking.status);
+
+  // Expected 4-digit verification code from reference
+  const expectedPin = booking.bookingReference.slice(-4).toUpperCase();
+
+  async function handlePostProgressNote() {
+    if (!progressNote.trim()) return;
+    setIsSubmittingNote(true);
+    try {
+      const res = await fetch(`/api/bookings/${booking.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          notes: progressNote.trim(),
+          stageNote: progressNote.trim(),
+        }),
+      });
+      if (res.ok) {
+        setNoteSuccess(true);
+        setProgressNote('');
+        setTimeout(() => setNoteSuccess(false), 3000);
+      }
+    } finally {
+      setIsSubmittingNote(false);
+    }
+  }
 
   async function handleStatusChange() {
     if (!nextAction) return;
+    if (nextAction.to === 'COMPLETED') {
+      setShowCompletionModal(true);
+      return;
+    }
     setUpdating(true);
     await onUpdateStatus(booking.id, nextAction.to);
     setUpdating(false);
   }
 
-  const navUrl = booking.address
-    ? `https://www.google.com/maps/dir/?api=1&destination=${booking.address.latitude},${booking.address.longitude}`
+  async function handleConfirmCompletion(e: React.FormEvent) {
+    e.preventDefault();
+    setOtpError(null);
+
+    const enteredClean = otpInput.trim().toUpperCase();
+    if (enteredClean && enteredClean !== expectedPin) {
+      setOtpError(`Invalid customer PIN. Please enter "${expectedPin}" or verify with customer.`);
+      return;
+    }
+
+    setUpdating(true);
+    await onUpdateStatus(booking.id, 'COMPLETED', completionNotes.trim());
+    setShowCompletionModal(false);
+    setUpdating(false);
+  }
+
+  const hasValidCoords = Boolean(
+    booking.address &&
+    typeof booking.address.latitude === 'number' &&
+    typeof booking.address.longitude === 'number' &&
+    (booking.address.latitude !== 0 || booking.address.longitude !== 0)
+  );
+
+  const destinationQuery = hasValidCoords
+    ? `${booking.address!.latitude},${booking.address!.longitude}`
+    : booking.address?.formattedAddress ||
+      (booking.address
+        ? [booking.address.formattedAddress, booking.address.addressLine2]
+            .filter(Boolean)
+            .join(', ')
+        : '');
+
+  const navUrl = destinationQuery
+    ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destinationQuery)}`
     : null;
 
   const dateStr = parseISO(booking.scheduledDate);
   const dateLabel = isToday(dateStr) ? 'Today' : isTomorrow(dateStr) ? 'Tomorrow' : format(dateStr, 'd MMM');
 
+  const cleanPhone = (booking.customer.phone || '').replace(/[^0-9]/g, '');
+  const waUrl = cleanPhone
+    ? `https://wa.me/${cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`}?text=${encodeURIComponent(
+        `Hello ${booking.customer.name}, this is your WristLoom certified horologist regarding your ${booking.watchBrand || 'timepiece'} service (ref #${booking.bookingReference}).`
+      )}`
+    : null;
+
   return (
-    <div className="bg-[#1E1A17] border border-[rgba(176,141,87,0.12)] rounded-[2px] overflow-hidden">
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-[rgba(176,141,87,0.08)]">
-        <div className="flex items-center gap-3">
-          <span className="font-mono text-[10px] text-[rgba(237,230,214,0.40)]">{booking.bookingReference}</span>
-          <Badge variant={STATUS_COLORS[booking.status] as any}>
-            {booking.status.replace(/_/g, ' ')}
-          </Badge>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-[rgba(237,230,214,0.45)]">
-          <Clock className="w-3 h-3" />
-          {dateLabel} · {booking.scheduledTimeStart}–{booking.scheduledTimeEnd}
-        </div>
-      </div>
-
-      <div className="p-5 space-y-4">
-        {/* Customer */}
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-[rgba(176,141,87,0.10)] flex items-center justify-center flex-shrink-0">
-            <span className="font-mono text-[10px] text-[#B08D57]">
-              {booking.customer.name?.charAt(0).toUpperCase()}
-            </span>
+    <>
+      <div className="bg-[#1E1A17] border border-[rgba(176,141,87,0.12)] rounded-[2px] overflow-hidden">
+        {/* Top bar */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[rgba(176,141,87,0.08)]">
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-[10px] text-[rgba(237,230,214,0.40)]">{booking.bookingReference}</span>
+            <Badge variant={STATUS_COLORS[booking.status] as any}>
+              {booking.status.replace(/_/g, ' ')}
+            </Badge>
           </div>
-          <div>
-            <p className="text-sm text-[#EDE6D6]">{booking.customer.name}</p>
-            <a href={`tel:${booking.customer.phone}`} className="flex items-center gap-1 text-xs text-[#B08D57] hover:underline mt-0.5">
-              <Phone className="w-3 h-3" /> {booking.customer.phone}
-            </a>
+          <div className="flex items-center gap-1.5 text-xs text-[rgba(237,230,214,0.45)]">
+            <Clock className="w-3 h-3" />
+            {dateLabel} · {booking.scheduledTimeStart}–{booking.scheduledTimeEnd}
           </div>
         </div>
 
-        {/* Watch + issue */}
-        {(booking.watchBrand || booking.issueDescription) && (
-          <div className="flex items-start gap-2">
-            <Watch className="w-4 h-4 text-[rgba(176,141,87,0.40)] flex-shrink-0 mt-0.5" />
+        <div className="p-5 space-y-4">
+          {/* Customer */}
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-[rgba(176,141,87,0.10)] flex items-center justify-center flex-shrink-0">
+              <span className="font-mono text-[10px] text-[#B08D57]">
+                {booking.customer.name?.charAt(0).toUpperCase()}
+              </span>
+            </div>
             <div>
-              {booking.watchBrand && (
-                <p className="text-sm text-[rgba(237,230,214,0.70)]">{booking.watchBrand} {booking.watchModel}</p>
-              )}
-              {booking.issueDescription && (
-                <p className="text-xs text-[rgba(237,230,214,0.40)] mt-0.5 leading-relaxed">{booking.issueDescription}</p>
-              )}
+              <p className="text-sm text-[#EDE6D6]">{booking.customer.name}</p>
+              <div className="flex items-center gap-3 mt-1">
+                <a href={`tel:${booking.customer.phone}`} className="flex items-center gap-1 text-xs text-[#B08D57] hover:underline">
+                  <Phone className="w-3 h-3" /> {booking.customer.phone}
+                </a>
+                {waUrl && (
+                  <a
+                    href={waUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+                  >
+                    <MessageCircle className="w-3 h-3" /> WhatsApp
+                  </a>
+                )}
+              </div>
             </div>
           </div>
-        )}
 
-        {/* Address */}
-        {booking.address && (
-          <div className="flex items-start gap-2">
-            <MapPin className="w-4 h-4 text-[rgba(176,141,87,0.40)] flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-sm text-[rgba(237,230,214,0.70)]">{booking.address.formattedAddress}</p>
-              {booking.address.addressLine2 && (
-                <p className="text-xs text-[rgba(237,230,214,0.45)]">{booking.address.addressLine2}</p>
+          {/* Watch + issue */}
+          {(booking.watchBrand || booking.issueDescription) && (
+            <div className="flex items-start gap-2">
+              <Watch className="w-4 h-4 text-[rgba(176,141,87,0.40)] flex-shrink-0 mt-0.5" />
+              <div>
+                {booking.watchBrand && (
+                  <p className="text-sm text-[rgba(237,230,214,0.70)]">{booking.watchBrand} {booking.watchModel}</p>
+                )}
+                {booking.issueDescription && (
+                  <p className="text-xs text-[rgba(237,230,214,0.40)] mt-0.5 leading-relaxed">{booking.issueDescription}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Address */}
+          {booking.address && (
+            <div className="flex items-start gap-2">
+              <MapPin className="w-4 h-4 text-[rgba(176,141,87,0.40)] flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm text-[rgba(237,230,214,0.70)]">{booking.address.formattedAddress}</p>
+                {booking.address.addressLine2 && (
+                  <p className="text-xs text-[rgba(237,230,214,0.45)]">{booking.address.addressLine2}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Customer-Visible Service Update Note Form */}
+          {booking.status !== 'COMPLETED' && booking.status !== 'CANCELLED' && (
+            <div className="pt-2 border-t border-[rgba(176,141,87,0.08)] space-y-2">
+              <label className="block font-mono text-[9px] tracking-widest uppercase text-[rgba(237,230,214,0.40)]">
+                Publish Live Progress Note to Customer
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={progressNote}
+                  onChange={(e) => setProgressNote(e.target.value)}
+                  placeholder="e.g. Movement disassembled and components inspected..."
+                  className="flex-1 bg-[#14110F] border border-[rgba(176,141,87,0.20)] rounded-[2px] px-3 py-1.5 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
+                />
+                <Button
+                  variant="subtle"
+                  size="sm"
+                  onClick={handlePostProgressNote}
+                  loading={isSubmittingNote}
+                  disabled={!progressNote.trim()}
+                >
+                  Post Update
+                </Button>
+              </div>
+              {noteSuccess && (
+                <p className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Note logged to timeline & visible to customer.
+                </p>
               )}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Actions */}
-        <div className="flex gap-3 pt-1">
-          {navUrl && (
-            <a
-              href={navUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 font-mono text-[10px] tracking-widest uppercase px-4 py-2.5 border border-[rgba(176,141,87,0.25)] text-[#B08D57] hover:bg-[rgba(176,141,87,0.08)] rounded-[2px] transition-colors"
-            >
-              <Navigation className="w-3.5 h-3.5" />
-              Start Navigation
-            </a>
-          )}
-          {nextAction && (
-            <Button
-              variant={nextAction.to === 'TECHNICIAN_EN_ROUTE' ? 'oxblood' : 'primary'}
-              size="md"
-              className="flex-1"
-              onClick={handleStatusChange}
-              loading={updating}
-            >
-              {nextAction.to === 'TECHNICIAN_EN_ROUTE' && "🚗 "}
-              {nextAction.label}
-            </Button>
-          )}
-          {booking.status === 'COMPLETED' && (
-            <div className="flex items-center gap-2 text-sm text-emerald-400">
-              <CheckCircle className="w-4 h-4" /> Service Completed
-            </div>
-          )}
+          {/* Actions */}
+          <div className="flex gap-3 pt-1">
+            {navUrl && (
+              <a
+                href={navUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 font-mono text-[10px] tracking-widest uppercase px-4 py-2.5 border border-[rgba(176,141,87,0.25)] text-[#B08D57] hover:bg-[rgba(176,141,87,0.08)] rounded-[2px] transition-colors"
+              >
+                <Navigation className="w-3.5 h-3.5" />
+                Start Navigation
+              </a>
+            )}
+            {nextAction && (
+              <Button
+                variant={nextAction.to === 'TECHNICIAN_EN_ROUTE' ? 'oxblood' : 'primary'}
+                size="md"
+                className="flex-1"
+                onClick={handleStatusChange}
+                loading={updating}
+              >
+                {nextAction.to === 'TECHNICIAN_EN_ROUTE' && "🚗 "}
+                {nextAction.label}
+              </Button>
+            )}
+            {booking.status === 'COMPLETED' && (
+              <div className="flex items-center gap-2 text-sm text-emerald-400 font-mono text-xs">
+                <CheckCircle className="w-4 h-4" /> Service Certified & Completed
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Service Completion & Handover Modal */}
+      {showCompletionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-lg bg-[#1E1A17] border border-[rgba(176,141,87,0.30)] rounded-[2px] p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-[rgba(176,141,87,0.15)]">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-[#B08D57]" />
+                <h3 className="font-display text-lg text-[#EDE6D6]">Certify Service Completion</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCompletionModal(false)}
+                className="text-[rgba(237,230,214,0.40)] hover:text-[#EDE6D6]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="bg-[#14110F] p-3 rounded-[2px] border border-[rgba(176,141,87,0.10)] text-xs space-y-1">
+              <p className="font-mono text-[#B08D57] font-medium">{booking.watchBrand || 'Horology'} {booking.watchModel}</p>
+              <p className="text-[rgba(237,230,214,0.60)]">Customer: {booking.customer.name} · Ref #{booking.bookingReference}</p>
+            </div>
+
+            <form onSubmit={handleConfirmCompletion} className="space-y-4">
+              <div>
+                <label className="block font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.50)] mb-1.5">
+                  Restoration & Diagnostic Notes *
+                </label>
+                <textarea
+                  rows={3}
+                  value={completionNotes}
+                  onChange={(e) => setCompletionNotes(e.target.value)}
+                  className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.20)] rounded-[2px] p-3 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
+                  placeholder="Describe parts replaced, calibration tolerances, regulation..."
+                  required
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.50)]">
+                    Customer Handover Code / PIN
+                  </label>
+                  <span className="font-mono text-[10px] text-[#B08D57]/70">
+                    PIN: {expectedPin}
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  value={otpInput}
+                  onChange={(e) => setOtpInput(e.target.value.toUpperCase())}
+                  placeholder={`Enter 4-character PIN (or leave blank to bypass)`}
+                  maxLength={6}
+                  className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.20)] rounded-[2px] px-3 py-2.5 text-xs text-[#EDE6D6] font-mono tracking-widest focus:border-[#B08D57] focus:outline-none"
+                />
+                {otpError && <p className="text-xs text-red-400 mt-1 font-mono">{otpError}</p>}
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCompletionModal(false)}
+                  className="flex-1 py-2.5 border border-[rgba(176,141,87,0.20)] text-xs font-mono uppercase text-[rgba(237,230,214,0.60)] hover:text-[#EDE6D6] rounded-[2px]"
+                >
+                  Cancel
+                </button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  className="flex-1"
+                  loading={updating}
+                >
+                  Certify & Complete
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

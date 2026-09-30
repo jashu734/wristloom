@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useBookingStore } from '@/store/bookingStore';
 import { Button } from '@/components/primitives/Button';
-import { MapPin } from 'lucide-react';
+import { MapPin, Compass, CheckCircle2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -25,8 +25,13 @@ type FormData = z.infer<typeof schema>;
 export function Step3Address() {
   const { address, setAddress, setStep } = useBookingStore();
   const [saving, setSaving] = React.useState(false);
+  const [gpsLoading, setGpsLoading] = React.useState(false);
+  const [coords, setCoords] = React.useState<{ lat: number; lng: number } | null>(
+    address?.latitude && address?.longitude ? { lat: address.latitude, lng: address.longitude } : null
+  );
+  const [gpsMessage, setGpsMessage] = React.useState<string | null>(null);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       fullName: address?.fullName ?? '',
@@ -38,6 +43,62 @@ export function Step3Address() {
       postalCode: address?.postalCode ?? '',
     },
   });
+
+  const handleUseCurrentLocation = () => {
+    if (!('geolocation' in navigator)) {
+      setGpsMessage('Geolocation is not supported by your browser.');
+      return;
+    }
+    setGpsLoading(true);
+    setGpsMessage(null);
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setCoords({ lat, lng });
+
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+          );
+          if (res.ok) {
+            const data = await res.json();
+            const addr = data.address || {};
+            const street = [
+              addr.house_number,
+              addr.building,
+              addr.road || addr.suburb || addr.neighbourhood,
+            ]
+              .filter(Boolean)
+              .join(' ');
+
+            if (street) setValue('addressLine1', street);
+            const city = addr.city || addr.town || addr.municipality || addr.district || '';
+            if (city) setValue('city', city);
+            const state = addr.state || '';
+            if (state) setValue('state', state);
+            const postcode = addr.postcode || '';
+            if (postcode) setValue('postalCode', postcode);
+
+            setGpsMessage(`Coordinates acquired: ${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E`);
+          } else {
+            setGpsMessage(`GPS Coordinates locked (${lat.toFixed(4)}, ${lng.toFixed(4)})`);
+          }
+        } catch {
+          setGpsMessage(`GPS Coordinates locked (${lat.toFixed(4)}, ${lng.toFixed(4)})`);
+        } finally {
+          setGpsLoading(false);
+        }
+      },
+      (err) => {
+        console.warn('Geolocation error:', err);
+        setGpsMessage('Could not retrieve GPS location. Please check browser permissions.');
+        setGpsLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   async function onSubmit(formData: FormData) {
     setSaving(true);
@@ -59,8 +120,8 @@ export function Step3Address() {
         state: formData.state,
         postalCode: formData.postalCode,
         formattedAddress: formatted,
-        latitude: 0,
-        longitude: 0,
+        latitude: coords?.lat ?? 0,
+        longitude: coords?.lng ?? 0,
         isDefault: false,
       };
 
@@ -71,7 +132,7 @@ export function Step3Address() {
       });
 
       const saved = res.ok ? await res.json() : null;
-      setAddress(payload, saved?.id);
+      setAddress({ ...payload, latitude: saved?.latitude ?? payload.latitude, longitude: saved?.longitude ?? payload.longitude }, saved?.id);
       setStep(4);
     } finally {
       setSaving(false);
@@ -88,6 +149,33 @@ export function Step3Address() {
           Where should our technician come? We&apos;ll save this address for future bookings.
         </p>
       </div>
+
+      <div className="mb-5 flex items-center justify-between p-3 bg-[#1E1A17] border border-[rgba(176,141,87,0.20)] rounded-[2px]">
+        <div className="flex items-center gap-2.5">
+          <MapPin className="w-4 h-4 text-[#B08D57]" />
+          <div>
+            <span className="font-mono text-xs text-[#EDE6D6] block">GPS Geolocation</span>
+            <span className="font-mono text-[10px] text-[rgba(237,230,214,0.40)]">
+              {coords ? `${coords.lat.toFixed(4)}° N, ${coords.lng.toFixed(4)}° E` : 'Auto-locate home bench for navigation'}
+            </span>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={handleUseCurrentLocation}
+          disabled={gpsLoading}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#14110F] border border-[rgba(176,141,87,0.30)] hover:border-[#B08D57] text-[#EDE6D6] hover:text-[#B08D57] rounded-[2px] text-xs font-mono tracking-wider transition-colors disabled:opacity-50"
+        >
+          <Compass className={`w-3.5 h-3.5 ${gpsLoading ? 'animate-spin text-[#B08D57]' : 'text-[#B08D57]'}`} />
+          <span>{gpsLoading ? 'Locating...' : 'Use Current Location'}</span>
+        </button>
+      </div>
+      {gpsMessage && (
+        <div className="mb-4 text-xs font-mono text-[#B08D57] bg-[rgba(176,141,87,0.08)] border border-[rgba(176,141,87,0.25)] px-3.5 py-2 rounded-[2px] flex items-center gap-2">
+          <CheckCircle2 className="w-3.5 h-3.5 text-[#B08D57] flex-shrink-0" />
+          <span>{gpsMessage}</span>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {/* Contact */}

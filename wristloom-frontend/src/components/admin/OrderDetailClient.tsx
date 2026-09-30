@@ -18,6 +18,7 @@ import {
   Save,
 } from 'lucide-react';
 import { Button } from '@/components/primitives/Button';
+import { formatCurrency } from '@/lib/utils';
 
 interface OrderDetailProps {
   order: any;
@@ -28,6 +29,28 @@ export function OrderDetailClient({ order: initialOrder }: OrderDetailProps) {
   const [order, setOrder] = React.useState(initialOrder);
   const [status, setStatus] = React.useState(initialOrder.status);
   const [paymentStatus, setPaymentStatus] = React.useState(initialOrder.paymentStatus);
+
+  // Initialize tracking fields from trackingInfo or notes
+  let initialTracking: any = initialOrder.trackingInfo;
+  if (!initialTracking && initialOrder.notes) {
+    try {
+      if (initialOrder.notes.startsWith('{')) initialTracking = JSON.parse(initialOrder.notes);
+    } catch {}
+  }
+
+  const [trackingNumber, setTrackingNumber] = React.useState<string>(
+    initialTracking?.trackingNumber || `WLTRK${initialOrder.orderReference?.replace(/[^0-9]/g, '') || '982341'}`
+  );
+  const [carrier, setCarrier] = React.useState<string>(
+    initialTracking?.carrier || 'BlueDart Apex Armored Courier'
+  );
+  const [estimatedDelivery, setEstimatedDelivery] = React.useState<string>(
+    initialTracking?.estimatedDelivery || ''
+  );
+  const [dispatchNotes, setDispatchNotes] = React.useState<string>(
+    initialTracking?.dispatchNotes || ''
+  );
+
   const [isUpdating, setIsUpdating] = React.useState(false);
   const [message, setMessage] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -39,7 +62,14 @@ export function OrderDetailClient({ order: initialOrder }: OrderDetailProps) {
       const res = await fetch(`/api/orders/${order.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, paymentStatus }),
+        body: JSON.stringify({
+          status,
+          paymentStatus,
+          trackingNumber,
+          carrier,
+          estimatedDelivery,
+          dispatchNotes,
+        }),
       });
 
       const data = await res.json();
@@ -49,7 +79,7 @@ export function OrderDetailClient({ order: initialOrder }: OrderDetailProps) {
       }
 
       setOrder(data.order);
-      setMessage({ type: 'success', text: 'Order status updated and customer notified.' });
+      setMessage({ type: 'success', text: 'Order status & consignment tracking updated. Customer notified.' });
       router.refresh();
     } catch {
       setMessage({ type: 'error', text: 'Network error updating order.' });
@@ -184,7 +214,7 @@ export function OrderDetailClient({ order: initialOrder }: OrderDetailProps) {
           <div className="space-y-3 text-xs">
             <div className="flex items-center justify-between">
               <span className="font-mono text-[10px] uppercase text-[rgba(237,230,214,0.40)]">Total Value</span>
-              <span className="font-display text-base text-[#B08D57]">₹{order.totalAmount?.toLocaleString()}</span>
+              <span className="font-display text-base text-[#B08D57]">{formatCurrency(order.totalAmount || 0)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="font-mono text-[10px] uppercase text-[rgba(237,230,214,0.40)]">Payment Method</span>
@@ -206,23 +236,31 @@ export function OrderDetailClient({ order: initialOrder }: OrderDetailProps) {
         </div>
       </div>
 
-      {/* Status Management Bar */}
-      <div className="bg-[#1E1A17] border border-[rgba(176,141,87,0.20)] rounded-[2px] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+      {/* Status & Consignment Management Bar */}
+      <div className="bg-[#1E1A17] border border-[rgba(176,141,87,0.20)] rounded-[2px] p-6 space-y-5">
+        <div className="flex items-center justify-between border-b border-[rgba(176,141,87,0.10)] pb-3">
+          <div className="flex items-center gap-2">
+            <Truck className="w-4 h-4 text-[#B08D57]" />
+            <h2 className="font-display text-base text-[#EDE6D6]">Fulfillment & Consignment Telemetry</h2>
+          </div>
+          <span className="font-mono text-[10px] text-[rgba(237,230,214,0.40)]">Admin Control</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <label className="block font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.40)] mb-1">
-              Order Fulfillment Status
+              Fulfillment Status
             </label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="bg-[#14110F] border border-[rgba(176,141,87,0.20)] rounded-[2px] px-3 py-1.5 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
+              className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.20)] rounded-[2px] px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
             >
-              <option value="PENDING">PENDING</option>
-              <option value="CONFIRMED">CONFIRMED</option>
-              <option value="PROCESSING">PROCESSING</option>
-              <option value="SHIPPED">SHIPPED</option>
-              <option value="DELIVERED">DELIVERED</option>
+              <option value="PENDING">PENDING (Order Placed)</option>
+              <option value="CONFIRMED">CONFIRMED (Order Confirmed)</option>
+              <option value="PROCESSING">PROCESSING (Vault Retrieval)</option>
+              <option value="SHIPPED">SHIPPED (In Transit)</option>
+              <option value="DELIVERED">DELIVERED (Signed For)</option>
               <option value="CANCELLED">CANCELLED</option>
             </select>
           </div>
@@ -234,20 +272,102 @@ export function OrderDetailClient({ order: initialOrder }: OrderDetailProps) {
             <select
               value={paymentStatus}
               onChange={(e) => setPaymentStatus(e.target.value)}
-              className="bg-[#14110F] border border-[rgba(176,141,87,0.20)] rounded-[2px] px-3 py-1.5 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
+              className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.20)] rounded-[2px] px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
             >
               <option value="UNPAID">UNPAID</option>
               <option value="DEPOSIT_PAID">DEPOSIT_PAID</option>
-              <option value="PAID">PAID</option>
+              <option value="PAID">PAID / FULLY_PAID</option>
               <option value="REFUNDED">REFUNDED</option>
             </select>
           </div>
+
+          <div>
+            <label className="block font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.40)] mb-1">
+              Consignment Tracking Code
+            </label>
+            <input
+              type="text"
+              value={trackingNumber}
+              onChange={(e) => setTrackingNumber(e.target.value)}
+              placeholder="e.g. WLTRK123456789"
+              className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.20)] rounded-[2px] px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="block font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.40)] mb-1">
+              Armored Carrier
+            </label>
+            <input
+              type="text"
+              value={carrier}
+              onChange={(e) => setCarrier(e.target.value)}
+              placeholder="e.g. BlueDart Apex Armored Logistics"
+              className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.20)] rounded-[2px] px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
+            />
+          </div>
         </div>
 
-        <Button onClick={handleUpdate} variant="primary" size="md" loading={isUpdating}>
-          <Save className="w-4 h-4 mr-1.5" />
-          <span>Update Order</span>
-        </Button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.40)] mb-1">
+              Estimated Delivery Date
+            </label>
+            <input
+              type="text"
+              value={estimatedDelivery}
+              onChange={(e) => setEstimatedDelivery(e.target.value)}
+              placeholder="e.g. 05 Oct 2026"
+              className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.20)] rounded-[2px] px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="block font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.40)] mb-1">
+              Dispatch Update Note (Customer-Visible)
+            </label>
+            <input
+              type="text"
+              value={dispatchNotes}
+              onChange={(e) => setDispatchNotes(e.target.value)}
+              placeholder="e.g. Timepiece inspected, sealed in vault box, handed to courier."
+              className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.20)] rounded-[2px] px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
+            />
+          </div>
+        </div>
+
+        {/* Quick Progression Buttons */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[rgba(176,141,87,0.10)]">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-[10px] uppercase text-[rgba(237,230,214,0.40)] mr-1">Quick Stage:</span>
+            <button
+              type="button"
+              onClick={() => setStatus('PROCESSING')}
+              className="px-2.5 py-1 text-[10px] font-mono uppercase bg-[#14110F] hover:bg-[rgba(176,141,87,0.15)] border border-[rgba(176,141,87,0.20)] text-[rgba(237,230,214,0.80)] rounded-[2px]"
+            >
+              → Processing
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatus('SHIPPED')}
+              className="px-2.5 py-1 text-[10px] font-mono uppercase bg-[#14110F] hover:bg-[rgba(176,141,87,0.15)] border border-[rgba(176,141,87,0.20)] text-[#B08D57] rounded-[2px]"
+            >
+              → Shipped
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatus('DELIVERED')}
+              className="px-2.5 py-1 text-[10px] font-mono uppercase bg-[#14110F] hover:bg-emerald-950/40 border border-emerald-800/40 text-emerald-400 rounded-[2px]"
+            >
+              ✓ Delivered
+            </button>
+          </div>
+
+          <Button onClick={handleUpdate} variant="primary" size="md" loading={isUpdating}>
+            <Save className="w-4 h-4 mr-1.5" />
+            <span>Save & Notify Customer</span>
+          </Button>
+        </div>
       </div>
 
       {/* Purchased Timepieces */}
@@ -262,9 +382,9 @@ export function OrderDetailClient({ order: initialOrder }: OrderDetailProps) {
             <div key={item.id} className="py-4 flex items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 {item.imageUrl ? (
-                  <div className="w-14 h-14 rounded-[2px] overflow-hidden border border-[rgba(176,141,87,0.20)] flex-shrink-0">
+                  <div className="w-14 h-14 rounded-[2px] overflow-hidden border border-[rgba(176,141,87,0.20)] bg-[#14110F] p-1 flex items-center justify-center flex-shrink-0">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-contain" />
                   </div>
                 ) : (
                   <div className="w-14 h-14 rounded-[2px] bg-[#14110F] border border-[rgba(176,141,87,0.20)] flex items-center justify-center flex-shrink-0 text-[#B08D57]">
@@ -281,9 +401,9 @@ export function OrderDetailClient({ order: initialOrder }: OrderDetailProps) {
               </div>
 
               <div className="text-right">
-                <p className="font-display text-base text-[#EDE6D6]">₹{(item.price * item.quantity).toLocaleString()}</p>
+                <p className="font-display text-base text-[#EDE6D6]">{formatCurrency((item.price || 0) * (item.quantity || 1))}</p>
                 <p className="font-mono text-[10px] text-[rgba(237,230,214,0.40)]">
-                  Qty: {item.quantity} × ₹{item.price?.toLocaleString()}
+                  Qty: {item.quantity} × {formatCurrency(item.price || 0)}
                 </p>
               </div>
             </div>

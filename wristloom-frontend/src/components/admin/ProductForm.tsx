@@ -3,17 +3,20 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/primitives/Button';
-import { ArrowLeft, Save, Plus, Trash2, Watch, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Save, Watch, CheckCircle2, ShieldAlert, Upload, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
+import { WATCH_BRANDS } from '@/lib/constants';
 
 interface ProductFormProps {
   initialData?: {
     id?: string;
     slug?: string;
     name: string;
+    modelName?: string | null;
     brand: string;
     referenceNumber?: string | null;
     price: number;
+    purchaseValue?: number | null;
     description: string;
     craftsmanshipNarrative?: string | null;
     movementType?: string | null;
@@ -28,38 +31,47 @@ interface ProductFormProps {
     condition?: string;
     year?: number | null;
     inStock?: boolean;
-    stockCount: number;
+    isActive?: boolean;
+    stockCount?: number;
+    stock?: number;
     images?: string[];
+    imageUrl?: string | null;
   };
   isEditing?: boolean;
 }
 
+const COMMON_MOVEMENTS = [
+  'Automatic',
+  'Manual Wind',
+  'Quartz',
+  'Solar',
+  'Eco-Drive',
+  'Automatic Chronograph',
+  'Kinetic',
+];
+
 export function ProductForm({ initialData, isEditing = false }: ProductFormProps) {
   const router = useRouter();
+
   const [formData, setFormData] = React.useState({
-    name: initialData?.name || '',
-    brand: initialData?.brand || '',
+    brand: initialData?.brand || WATCH_BRANDS[0],
+    modelName: initialData?.modelName || initialData?.name || '',
     referenceNumber: initialData?.referenceNumber || '',
-    price: initialData?.price ? String(initialData.price) : '',
-    stockCount: initialData?.stockCount !== undefined ? String(initialData.stockCount) : '1',
-    condition: initialData?.condition || 'New',
-    year: initialData?.year ? String(initialData.year) : new Date().getFullYear().toString(),
-    inStock: initialData?.inStock !== undefined ? initialData.inStock : true,
+    caseSize: initialData?.caseSize || '40.5 mm',
     movementType: initialData?.movementType || 'Automatic',
-    movementCaliber: initialData?.movementCaliber || '',
-    powerReserve: initialData?.powerReserve || '48 Hours',
-    caseMaterial: initialData?.caseMaterial || 'Oystersteel',
-    caseSize: initialData?.caseSize || '40mm',
-    dialColor: initialData?.dialColor || 'Black',
-    crystal: initialData?.crystal || 'Sapphire',
-    waterResistance: initialData?.waterResistance || '100m',
+    purchaseValue: initialData?.purchaseValue ? String(initialData.purchaseValue) : (initialData?.price ? String(initialData.price) : ''),
+    stock: initialData?.stock !== undefined ? String(initialData.stock) : (initialData?.stockCount !== undefined ? String(initialData.stockCount) : '5'),
+    imageUrl: initialData?.imageUrl || initialData?.images?.[0] || '/watches/seiko-srpb43j1.svg',
     description: initialData?.description || '',
-    craftsmanshipNarrative: initialData?.craftsmanshipNarrative || '',
-    imageUrl: initialData?.images?.[0] || '',
+    isActive: initialData?.isActive !== undefined ? initialData.isActive : true,
+    condition: initialData?.condition || 'New',
   });
 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isUploading, setIsUploading] = React.useState(false);
   const [statusMessage, setStatusMessage] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -71,36 +83,67 @@ export function ProductForm({ initialData, isEditing = false }: ProductFormProps
     }
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setStatusMessage(null);
+
+    try {
+      const uploadData = new FormData();
+      uploadData.append('file', file);
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: uploadData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to upload image');
+      }
+
+      setFormData((prev) => ({ ...prev, imageUrl: data.url }));
+      setStatusMessage({ type: 'success', text: 'Image uploaded and persisted successfully.' });
+    } catch (err: any) {
+      console.error('Upload error:', err);
+      setStatusMessage({ type: 'error', text: err.message || 'Image upload failed' });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setStatusMessage(null);
 
+    const pValue = parseFloat(formData.purchaseValue) || 0;
+    const stockVal = parseInt(formData.stock, 10) || 0;
+
     const payload = {
-      name: formData.name.trim(),
       brand: formData.brand.trim(),
-      referenceNumber: formData.referenceNumber.trim() || undefined,
-      price: parseFloat(formData.price) || 0,
-      stockCount: parseInt(formData.stockCount, 10) || 0,
-      condition: formData.condition,
-      year: formData.year ? parseInt(formData.year, 10) : undefined,
-      inStock: Boolean(formData.inStock),
-      movementType: formData.movementType || undefined,
-      movementCaliber: formData.movementCaliber || undefined,
-      powerReserve: formData.powerReserve || undefined,
-      caseMaterial: formData.caseMaterial || undefined,
-      caseSize: formData.caseSize || undefined,
-      dialColor: formData.dialColor || undefined,
-      crystal: formData.crystal || undefined,
-      waterResistance: formData.waterResistance || undefined,
+      modelName: formData.modelName.trim(),
+      name: formData.modelName.trim(),
+      referenceNumber: String(formData.referenceNumber).trim(),
+      caseSize: formData.caseSize.trim(),
+      movementType: formData.movementType.trim(),
+      purchaseValue: pValue,
+      price: pValue,
+      stock: stockVal,
+      stockCount: stockVal,
+      imageUrl: formData.imageUrl.trim() || '/watches/placeholder-watch.svg',
+      images: [formData.imageUrl.trim() || '/watches/placeholder-watch.svg'],
       description: formData.description.trim(),
-      craftsmanshipNarrative: formData.craftsmanshipNarrative.trim() || undefined,
-      images: formData.imageUrl.trim() ? [formData.imageUrl.trim()] : [],
+      isActive: Boolean(formData.isActive),
+      inStock: stockVal > 0,
+      condition: formData.condition,
     };
 
     try {
       const url = isEditing && initialData?.id ? `/api/products/${initialData.id}` : '/api/products';
-      const method = isEditing ? 'PATCH' : 'POST';
+      const method = isEditing ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
         method,
@@ -117,7 +160,7 @@ export function ProductForm({ initialData, isEditing = false }: ProductFormProps
 
       setStatusMessage({
         type: 'success',
-        text: isEditing ? 'Timepiece updated successfully.' : 'Timepiece created successfully.',
+        text: isEditing ? 'Timepiece updated successfully.' : 'Timepiece created successfully in catalog.',
       });
 
       setTimeout(() => {
@@ -149,10 +192,10 @@ export function ProductForm({ initialData, isEditing = false }: ProductFormProps
           </Link>
           <div>
             <span className="font-mono text-[10px] tracking-widest uppercase text-[#B08D57] block mb-0.5">
-              Watch Inventory
+              Admin Catalog Management
             </span>
             <h1 className="font-display text-2xl text-[#EDE6D6]">
-              {isEditing ? `Edit: ${initialData?.name}` : 'Acquire New Watch into Catalog'}
+              {isEditing ? `Edit: ${initialData?.brand} ${initialData?.modelName || initialData?.name}` : 'Add New Watch to Catalog'}
             </h1>
           </div>
         </div>
@@ -177,7 +220,7 @@ export function ProductForm({ initialData, isEditing = false }: ProductFormProps
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="bg-[#1E1A17] border border-[rgba(176,141,87,0.15)] rounded-[2px] p-6 space-y-6">
-        {/* Basic Information */}
+        {/* Watch Identity */}
         <div>
           <h2 className="font-display text-base text-[#EDE6D6] mb-4 pb-2 border-b border-[rgba(176,141,87,0.10)] flex items-center gap-2">
             <Watch className="w-4 h-4 text-[#B08D57]" />
@@ -185,70 +228,77 @@ export function ProductForm({ initialData, isEditing = false }: ProductFormProps
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <label className={labelClass}>Watch Name *</label>
-              <input
-                required
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                placeholder="e.g. Submariner Date"
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Maison / Brand *</label>
-              <input
+              <label className={labelClass}>Brand (12 Authorized Brands) *</label>
+              <select
                 required
                 name="brand"
                 value={formData.brand}
                 onChange={handleChange}
-                placeholder="e.g. Rolex, Omega, Patek Philippe"
+                className={inputClass}
+              >
+                {WATCH_BRANDS.map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelClass}>Model Name *</label>
+              <input
+                required
+                name="modelName"
+                value={formData.modelName}
+                onChange={handleChange}
+                placeholder="e.g. Presage Cocktail Time"
                 className={inputClass}
               />
             </div>
             <div>
-              <label className={labelClass}>Reference Number</label>
+              <label className={labelClass}>Reference Number (String) *</label>
               <input
+                required
                 name="referenceNumber"
                 value={formData.referenceNumber}
                 onChange={handleChange}
-                placeholder="e.g. 126610LN"
+                placeholder="e.g. SRPB43J1"
                 className={inputClass}
               />
             </div>
           </div>
         </div>
 
-        {/* Pricing & Stock */}
+        {/* Technical Specifications */}
         <div>
           <h2 className="font-display text-base text-[#EDE6D6] mb-4 pb-2 border-b border-[rgba(176,141,87,0.10)]">
-            Valuation & Stock
+            Technical & Dimension Specifications
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <label className={labelClass}>Price (INR ₹) *</label>
+              <label className={labelClass}>Case Size *</label>
               <input
                 required
-                type="number"
-                name="price"
-                value={formData.price}
+                name="caseSize"
+                value={formData.caseSize}
                 onChange={handleChange}
-                placeholder="e.g. 1250000"
-                min="1"
+                placeholder="e.g. 40.5 mm"
                 className={inputClass}
               />
             </div>
             <div>
-              <label className={labelClass}>Stock Count *</label>
-              <input
-                required
-                type="number"
-                name="stockCount"
-                value={formData.stockCount}
+              <label className={labelClass}>Movement Type *</label>
+              <select
+                name="movementType"
+                value={formData.movementType}
                 onChange={handleChange}
-                min="0"
                 className={inputClass}
-              />
+              >
+                {COMMON_MOVEMENTS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className={labelClass}>Condition</label>
@@ -258,14 +308,37 @@ export function ProductForm({ initialData, isEditing = false }: ProductFormProps
                 <option value="Vintage">Vintage Collector Piece</option>
               </select>
             </div>
+          </div>
+        </div>
+
+        {/* Valuation & Stock */}
+        <div>
+          <h2 className="font-display text-base text-[#EDE6D6] mb-4 pb-2 border-b border-[rgba(176,141,87,0.10)]">
+            Valuation & Stock
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className={labelClass}>Year of Production</label>
+              <label className={labelClass}>Purchase Value (INR ₹) *</label>
               <input
+                required
                 type="number"
-                name="year"
-                value={formData.year}
+                name="purchaseValue"
+                value={formData.purchaseValue}
                 onChange={handleChange}
-                placeholder="2026"
+                placeholder="e.g. 45000"
+                min="1"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Stock Available (Units) *</label>
+              <input
+                required
+                type="number"
+                name="stock"
+                value={formData.stock}
+                onChange={handleChange}
+                min="0"
                 className={inputClass}
               />
             </div>
@@ -274,152 +347,108 @@ export function ProductForm({ initialData, isEditing = false }: ProductFormProps
           <div className="mt-4 flex items-center gap-3">
             <input
               type="checkbox"
-              id="inStock"
-              name="inStock"
-              checked={formData.inStock}
+              id="isActive"
+              name="isActive"
+              checked={formData.isActive}
               onChange={handleChange}
               className="w-4 h-4 accent-[#B08D57]"
             />
-            <label htmlFor="inStock" className="text-xs text-[rgba(237,230,214,0.70)] select-none">
-              Active in Boutique Catalog (Immediate purchase enabled)
+            <label htmlFor="isActive" className="text-xs text-[rgba(237,230,214,0.70)] select-none">
+              Active in Watch Catalog (Visible to customers for purchase)
             </label>
           </div>
         </div>
 
-        {/* Horological Specifications */}
+        {/* Product Image & Upload */}
         <div>
-          <h2 className="font-display text-base text-[#EDE6D6] mb-4 pb-2 border-b border-[rgba(176,141,87,0.10)]">
-            Horological Specifications
+          <h2 className="font-display text-base text-[#EDE6D6] mb-4 pb-2 border-b border-[rgba(176,141,87,0.10)] flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ImageIcon className="w-4 h-4 text-[#B08D57]" />
+              <span>Product Image Accuracy</span>
+            </div>
+            <span className="font-mono text-[10px] text-[#B08D57]">Exact watch reference match</span>
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <label className={labelClass}>Movement Type</label>
-              <input
-                name="movementType"
-                value={formData.movementType}
-                onChange={handleChange}
-                placeholder="Automatic, Manual-Wind, Tourbillon"
-                className={inputClass}
-              />
+          
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-start">
+            <div className="sm:col-span-2 space-y-3">
+              <div>
+                <label className={labelClass}>Image URL or Asset Path</label>
+                <input
+                  name="imageUrl"
+                  value={formData.imageUrl}
+                  onChange={handleChange}
+                  placeholder="/watches/seiko-srpb43j1.svg or https://..."
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className={labelClass}>Or Upload Exact Timepiece Photo</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                    accept="image/*"
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="subtle"
+                    size="sm"
+                    loading={isUploading}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="w-3.5 h-3.5 mr-1.5" />
+                    Upload Image File
+                  </Button>
+                  <span className="text-[11px] text-[rgba(237,230,214,0.40)]">
+                    Saved to local storage & persisted to database.
+                  </span>
+                </div>
+              </div>
             </div>
-            <div>
-              <label className={labelClass}>Movement Caliber</label>
-              <input
-                name="movementCaliber"
-                value={formData.movementCaliber}
-                onChange={handleChange}
-                placeholder="e.g. 3235"
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Power Reserve</label>
-              <input
-                name="powerReserve"
-                value={formData.powerReserve}
-                onChange={handleChange}
-                placeholder="e.g. 70 Hours"
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Case Material</label>
-              <input
-                name="caseMaterial"
-                value={formData.caseMaterial}
-                onChange={handleChange}
-                placeholder="Oystersteel, 18ct Rose Gold, Platinum"
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Case Diameter</label>
-              <input
-                name="caseSize"
-                value={formData.caseSize}
-                onChange={handleChange}
-                placeholder="e.g. 41mm"
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Dial Color</label>
-              <input
-                name="dialColor"
-                value={formData.dialColor}
-                onChange={handleChange}
-                placeholder="Black, Sunburst Blue, Olive Green"
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Crystal</label>
-              <input
-                name="crystal"
-                value={formData.crystal}
-                onChange={handleChange}
-                placeholder="Scratch-resistant Sapphire"
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Water Resistance</label>
-              <input
-                name="waterResistance"
-                value={formData.waterResistance}
-                onChange={handleChange}
-                placeholder="300m / 1,000 feet"
-                className={inputClass}
-              />
+
+            {/* Preview */}
+            <div className="flex flex-col items-center justify-center p-3 bg-[#14110F] border border-[rgba(176,141,87,0.15)] rounded-[2px] text-center">
+              <div className="w-32 h-32 rounded-[2px] overflow-hidden border border-[rgba(176,141,87,0.20)] bg-[#1a1614] flex items-center justify-center mb-2">
+                {formData.imageUrl ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={formData.imageUrl}
+                    alt="Preview"
+                    className="w-full h-full object-contain p-2"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/watches/placeholder-watch.svg';
+                    }}
+                  />
+                ) : (
+                  <Watch className="w-8 h-8 text-[rgba(176,141,87,0.30)]" />
+                )}
+              </div>
+              <span className="text-[10px] font-mono text-[rgba(237,230,214,0.50)] truncate max-w-[140px]">
+                {formData.referenceNumber || 'No Ref Number'}
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Media & Narrative */}
+        {/* Narrative & Description */}
         <div>
           <h2 className="font-display text-base text-[#EDE6D6] mb-4 pb-2 border-b border-[rgba(176,141,87,0.10)]">
-            Imagery & Editorial Narrative
+            Description
           </h2>
-          <div className="space-y-4">
-            <div>
-              <label className={labelClass}>Product Image URL</label>
-              <input
-                name="imageUrl"
-                value={formData.imageUrl}
-                onChange={handleChange}
-                placeholder="https://images.unsplash.com/photo-..."
-                className={inputClass}
-              />
-              {formData.imageUrl && (
-                <div className="mt-2 w-24 h-24 rounded-[2px] overflow-hidden border border-[rgba(176,141,87,0.20)]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={formData.imageUrl} alt="Preview" className="w-full h-full object-cover" />
-                </div>
-              )}
-            </div>
-            <div>
-              <label className={labelClass}>Boutique Description *</label>
-              <textarea
-                required
-                rows={3}
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                placeholder="Detailed description of the timepiece, provenance, condition, and full box/papers inclusion..."
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Craftsmanship Narrative</label>
-              <textarea
-                rows={2}
-                name="craftsmanshipNarrative"
-                value={formData.craftsmanshipNarrative}
-                onChange={handleChange}
-                placeholder="Atelier notes regarding hand-finishing, beveling, or Geneva stripes..."
-                className={inputClass}
-              />
-            </div>
+          <div>
+            <label className={labelClass}>Watch Description *</label>
+            <textarea
+              required
+              rows={4}
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              placeholder="Detailed description of the timepiece, dial finish, movement specifications, and atelier notes..."
+              className={inputClass}
+            />
           </div>
         </div>
 
@@ -433,7 +462,7 @@ export function ProductForm({ initialData, isEditing = false }: ProductFormProps
           </Link>
           <Button type="submit" variant="primary" size="md" loading={isSubmitting}>
             <Save className="w-4 h-4 mr-1.5" />
-            <span>{isEditing ? 'Save Changes' : 'Create Timepiece'}</span>
+            <span>{isEditing ? 'Save Changes' : 'Create Watch'}</span>
           </Button>
         </div>
       </form>

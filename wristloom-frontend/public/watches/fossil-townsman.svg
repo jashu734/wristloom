@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+  <defs>
+    <radialGradient id="fossilRose" cx="30%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#f7ded6"/>
+      <stop offset="50%" stop-color="#dfa898"/>
+      <stop offset="100%" stop-color="#a86e5e"/>
+    </radialGradient>
+  </defs>
+  <rect width="500" height="500" fill="#14110f"/>
+  <!-- Brown Leather -->
+  <rect x="205" y="20" width="90" height="135" fill="#3b2219" rx="3"/>
+  <rect x="205" y="345" width="90" height="135" fill="#3b2219" rx="3"/>
+
+  <!-- Rose Gold Case -->
+  <circle cx="250" cy="250" r="148" fill="url(#fossilRose)" stroke="#804b3d" stroke-width="2"/>
+  <circle cx="250" cy="250" r="132" fill="#1a1c20"/>
+
+  <!-- Skeleton Openwork Gears in Center -->
+  <circle cx="250" cy="250" r="65" fill="#121316" stroke="#caa45a" stroke-width="2"/>
+  <circle cx="235" cy="245" r="28" fill="none" stroke="#e2a878" stroke-width="3" stroke-dasharray="6,3"/>
+  <circle cx="265" cy="255" r="22" fill="none" stroke="#d4d4d8" stroke-width="2.5" stroke-dasharray="5,2"/>
+
+  <text x="250" y="165" font-family="'Cinzel', serif" font-size="14" font-weight="bold" fill="#f2cbbe" text-anchor="middle" letter-spacing="2">FOSSIL</text>
+  <text x="250" y="178" font-family="sans-serif" font-size="7.5" fill="#caa45a" text-anchor="middle">AUTOMATIC</text>
+  <text x="250" y="335" font-family="sans-serif" font-size="6.5" fill="#a1a1aa" text-anchor="middle">ME3098 · 44MM</text>
+
+  <!-- Blue Hands -->
+  <line x1="250" y1="250" x2="250" y2="165" stroke="#3b82f6" stroke-width="2.5"/>
+  <line x1="250" y1="250" x2="310" y2="250" stroke="#3b82f6" stroke-width="2"/>
+  <circle cx="250" cy="250" r="4" fill="#3b82f6"/>
+</svg>

@@ -52,39 +52,31 @@ export const FOOTER_NAV = {
 // ─── Brand List ──────────────────────────────────────────────
 
 export const WATCH_BRANDS = [
-  'Rolex',
-  'Patek Philippe',
-  'Audemars Piguet',
-  'A. Lange & Söhne',
-  'Vacheron Constantin',
-  'IWC Schaffhausen',
-  'Jaeger-LeCoultre',
-  'Breguet',
-  'Blancpain',
-  'Omega',
-  'Cartier',
-  'Richard Mille',
-  'Hublot',
+  'Titan',
+  'Fastrack',
+  'Sonata',
+  'Timex',
+  'Casio',
+  'Fossil',
+  'Seiko',
+  'Citizen',
+  'Tissot',
   'TAG Heuer',
-  'Panerai',
-  'Breitling',
-  'Chopard',
-  'Zenith',
-  'Grand Seiko',
-  'Tudor',
+  'Rado',
+  'Omega',
 ] as const;
 
 // ─── Service Types ───────────────────────────────────────────
 
 export const REPAIR_SERVICE_TYPES = [
-  { id: 'full_service', label: 'Full Service & Overhaul', description: 'Complete movement disassembly, cleaning, and reassembly', base_price: 18000, duration: '14–21 days' },
-  { id: 'crystal_replacement', label: 'Crystal Replacement', description: 'Sapphire or mineral crystal replacement', base_price: 4500, duration: '3–5 days' },
-  { id: 'bracelet_service', label: 'Bracelet & Clasp Service', description: 'Link tightening, polishing, and clasp repair', base_price: 2800, duration: '2–3 days' },
-  { id: 'water_resistance', label: 'Water Resistance Testing & Sealing', description: 'Gasket replacement and pressure testing', base_price: 3500, duration: '2–4 days' },
-  { id: 'battery_replacement', label: 'Battery Replacement', description: 'Quartz battery replacement and pressure testing', base_price: 1200, duration: '1 day' },
-  { id: 'strap_replacement', label: 'Strap Replacement', description: 'Leather, rubber, or metal bracelet replacement', base_price: 1500, duration: '1–2 days' },
+  { id: 'full_service', label: 'Full Service & Overhaul', description: 'Complete movement disassembly, ultrasonic cleaning, and regulation', base_price: 18000, duration: '14–21 days' },
+  { id: 'crystal_replacement', label: 'Crystal Replacement', description: 'Sapphire or mineral crystal replacement with pressure seal', base_price: 6500, duration: '3–5 days' },
+  { id: 'bracelet_service', label: 'Bracelet & Clasp Service', description: 'Link tightening, ultrasonic polishing, and clasp refurbishment', base_price: 3500, duration: '2–3 days' },
+  { id: 'water_resistance', label: 'Water Resistance Testing & Sealing', description: 'Gasket replacement and multi-bar pressure testing', base_price: 2500, duration: '2–4 days' },
+  { id: 'battery_replacement', label: 'Battery Replacement', description: 'Quartz battery replacement and pressure testing', base_price: 1500, duration: '1 day' },
+  { id: 'strap_replacement', label: 'Strap Replacement', description: 'Bespoke leather, rubber, or metal bracelet fitting', base_price: 3500, duration: '1–2 days' },
   { id: 'regulation', label: 'Regulation & Timing', description: 'Movement regulation and accuracy adjustment', base_price: 5500, duration: '5–7 days' },
-  { id: 'restoration', label: 'Full Restoration', description: 'Case polishing, dial restoration, and complete movement service', base_price: 35000, duration: '30–45 days' },
+  { id: 'restoration', label: 'Full Horological Restoration', description: 'Laser welding, case geometry recovery, dial conservation, and movement overhaul', base_price: 45000, duration: '30–45 days' },
 ] as const;
 
 // ─── FAQ Categories ──────────────────────────────────────────

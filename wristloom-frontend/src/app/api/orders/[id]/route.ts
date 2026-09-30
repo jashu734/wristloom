@@ -34,7 +34,10 @@ export async function GET(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
-    if (session?.user) {
+    if (order.userId) {
+      if (!session?.user) {
+        return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+      }
       const isOwner = order.userId === session.user.id;
       const isAdmin = session.user.role === 'ADMIN';
       if (!isOwner && !isAdmin) {
@@ -42,7 +45,22 @@ export async function GET(req: NextRequest, context: RouteContext) {
       }
     }
 
-    return NextResponse.json({ order });
+    // Parse tracking info from notes if structured
+    let trackingInfo: any = null;
+    try {
+      if (order.notes && (order.notes.startsWith('{') || order.notes.includes('"trackingNumber"'))) {
+        trackingInfo = JSON.parse(order.notes);
+      }
+    } catch {
+      // not JSON notes
+    }
+
+    return NextResponse.json({
+      order: {
+        ...order,
+        trackingInfo,
+      },
+    });
   } catch (error: any) {
     console.error('[Order GET Error]', error);
     return NextResponse.json({ error: error.message ?? 'Failed to fetch order' }, { status: 500 });
@@ -58,7 +76,15 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
 
     const { id } = await context.params;
     const body = await req.json();
-    const { status, paymentStatus } = body;
+    const {
+      status,
+      paymentStatus,
+      trackingNumber,
+      carrier,
+      estimatedDelivery,
+      dispatchNotes,
+      subStatus,
+    } = body;
 
     const existing = await db.order.findFirst({
       where: {
@@ -70,7 +96,59 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
-    const data: any = {};
+    // Parse existing structured notes or initialize
+    let currentTrackingData: any = {};
+    try {
+      if (existing.notes && (existing.notes.startsWith('{') || existing.notes.includes('"trackingNumber"'))) {
+        currentTrackingData = JSON.parse(existing.notes);
+      } else if (existing.notes) {
+        currentTrackingData.legacyNotes = existing.notes;
+      }
+    } catch {
+      currentTrackingData.legacyNotes = existing.notes;
+    }
+
+    if (trackingNumber !== undefined) currentTrackingData.trackingNumber = trackingNumber;
+    if (carrier !== undefined) currentTrackingData.carrier = carrier;
+    if (estimatedDelivery !== undefined) currentTrackingData.estimatedDelivery = estimatedDelivery;
+    if (dispatchNotes !== undefined) currentTrackingData.dispatchNotes = dispatchNotes;
+    if (subStatus !== undefined) currentTrackingData.subStatus = subStatus;
+
+    // Maintain timeline history events
+    if (!Array.isArray(currentTrackingData.events)) {
+      currentTrackingData.events = [
+        {
+          status: 'PENDING',
+          title: 'Order Placed',
+          timestamp: existing.createdAt.toISOString(),
+          note: 'Acquisition order initiated through concierge.',
+        },
+      ];
+    }
+
+    const effectiveStatus = status || existing.status;
+    if (status && status !== existing.status) {
+      const stageTitles: Record<string, string> = {
+        CONFIRMED: 'Order Confirmed',
+        PROCESSING: 'Processing & Vault Retrieval',
+        SHIPPED: 'Dispatched with Armored Courier',
+        DELIVERED: 'Delivered & Handed Over',
+        CANCELLED: 'Order Cancelled',
+      };
+
+      currentTrackingData.events.push({
+        status,
+        title: stageTitles[status] || status,
+        timestamp: new Date().toISOString(),
+        note: dispatchNotes || `Status updated to ${status} by atelier administration.`,
+        updatedBy: session.user.name || 'Wristloom Atelier',
+      });
+    }
+
+    const data: any = {
+      notes: JSON.stringify(currentTrackingData),
+    };
+
     if (status) data.status = status;
     if (paymentStatus) data.paymentStatus = paymentStatus;
 
@@ -87,12 +165,19 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
           userId: existing.userId,
           type: 'BOOKING_CONFIRMED',
           title: `Order Status: ${status}`,
-          body: `Your acquisition #${existing.orderReference} status is now ${status}.`,
+          body: `Your acquisition #${existing.orderReference} status is now ${status}. ${
+            trackingNumber ? `Tracking number: ${trackingNumber}` : ''
+          }`,
         },
       }).catch((e) => console.warn('Order status notif warning:', e));
     }
 
-    return NextResponse.json({ order: updated });
+    return NextResponse.json({
+      order: {
+        ...updated,
+        trackingInfo: currentTrackingData,
+      },
+    });
   } catch (error: any) {
     console.error('[Order PATCH Error]', error);
     return NextResponse.json({ error: error.message ?? 'Failed to update order' }, { status: 500 });

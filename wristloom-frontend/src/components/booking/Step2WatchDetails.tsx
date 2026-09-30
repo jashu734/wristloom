@@ -24,6 +24,7 @@ export function Step2WatchDetails() {
           setWatchDetails, addIssueImage, setStep } = useBookingStore();
 
   const [uploading, setUploading] = React.useState(false);
+  const [uploadError, setUploadError] = React.useState<string | null>(null);
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -31,11 +32,16 @@ export function Step2WatchDetails() {
   });
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
+    const files = Array.from(e.target.files ?? []) as File[];
     if (files.length === 0) return;
     setUploading(true);
+    setUploadError(null);
     try {
       for (const file of files) {
+        if (file.size > 10 * 1024 * 1024) {
+          setUploadError(`File "${file.name}" exceeds the 10MB limit.`);
+          continue;
+        }
         const fd = new FormData();
         fd.append('file', file);
         fd.append('bucket', 'repair-photos');
@@ -43,8 +49,13 @@ export function Step2WatchDetails() {
         if (res.ok) {
           const { url } = await res.json();
           addIssueImage(url);
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          setUploadError(errData.error || `Upload failed for ${file.name}. Please ensure you are logged in.`);
         }
       }
+    } catch {
+      setUploadError('Network error uploading file. Please try again.');
     } finally {
       setUploading(false);
     }
@@ -69,7 +80,7 @@ export function Step2WatchDetails() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.45)] mb-1.5">Brand *</label>
-            <input {...register('watchBrand')} placeholder="e.g. Rolex" className={inputClass} />
+            <input {...register('watchBrand')} placeholder="e.g. Seiko" className={inputClass} />
             {errors.watchBrand && <p className="text-xs text-red-400 mt-1">{errors.watchBrand.message}</p>}
           </div>
           <div>
@@ -108,10 +119,11 @@ export function Step2WatchDetails() {
             <span className="font-mono text-[9px] text-[rgba(237,230,214,0.30)]">JPG, PNG, WEBP up to 10MB</span>
             <input type="file" accept="image/*" multiple className="sr-only" onChange={handleImageUpload} disabled={uploading} />
           </label>
+          {uploadError && <p className="text-xs text-red-400 mt-1.5">{uploadError}</p>}
 
           {issueImages.length > 0 && (
             <div className="flex gap-2 flex-wrap mt-3">
-              {issueImages.map((url, i) => (
+              {issueImages.map((url: string, i: number) => (
                 <div key={i} className="relative w-16 h-16 rounded-[2px] overflow-hidden border border-[rgba(176,141,87,0.20)]">
                   <img src={url} alt="" className="w-full h-full object-cover" />
                 </div>

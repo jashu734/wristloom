@@ -161,10 +161,10 @@ export function AuthenticationClient() {
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <FormField label="Brand" name="brand" value={form.brand} onChange={handleChange} required placeholder="e.g. Rolex" />
-                    <FormField label="Model" name="model" value={form.model} onChange={handleChange} required placeholder="e.g. Submariner" />
+                    <FormField label="Brand" name="brand" value={form.brand} onChange={handleChange} required placeholder="e.g. Seiko" />
+                    <FormField label="Model" name="model" value={form.model} onChange={handleChange} required placeholder="e.g. Presage Cocktail Time" />
                   </div>
-                  <FormField label="Reference Number" name="reference_number" value={form.reference_number} onChange={handleChange} placeholder="e.g. 126610LN" mono />
+                  <FormField label="Reference Number" name="reference_number" value={form.reference_number} onChange={handleChange} placeholder="e.g. SRPB43J1" mono />
                   <FormField label="Description" name="description" value={form.description} onChange={handleChange} multiline placeholder="Brief description of the watch and its condition" required />
                   <FormField label="Ownership Context" name="ownership_context" value={form.ownership_context} onChange={handleChange} multiline placeholder="How did you acquire this watch? Do you have box and papers?" />
 

@@ -1,39 +1,43 @@
 // ============================================================
 // Wristloom — Orders API Route
-// GET: Customer orders (or all orders for Admin)
-// POST: Create new order
+// Server-side price calculation, inventory checks, strong references
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { auth } from '@/lib/auth';
 import { z } from 'zod';
+import { isUserAdmin } from '@/lib/roles';
+import { generateOrderReference } from '@/lib/guest';
+import { verifyAndReserveInventory } from '@/lib/inventory';
 
 const createOrderSchema = z.object({
-  items: z.array(
-    z.object({
-      productId: z.string().optional(),
-      name: z.string(),
-      brand: z.string(),
-      referenceNumber: z.string().optional(),
-      price: z.number(),
-      quantity: z.number().int().positive().default(1),
-      imageUrl: z.string().optional(),
-      strapOption: z.any().optional(),
-    })
-  ).min(1, 'Order must contain at least one item'),
-  totalAmount: z.number().positive(),
-  shippingName: z.string().min(2, 'Name is required'),
-  shippingEmail: z.string().email('Valid email is required'),
-  shippingPhone: z.string().min(6, 'Phone is required'),
+  items: z
+    .array(
+      z.object({
+        productId: z.string().min(1, 'Product ID required'),
+        quantity: z.number().int().min(1).max(10).default(1),
+        strapOption: z
+          .object({
+            id: z.string(),
+            material: z.string(),
+            price_addon: z.number().default(0),
+          })
+          .optional(),
+      })
+    )
+    .min(1, 'Order must contain at least one item'),
+  shippingName: z.string().trim().min(2, 'Name is required').max(100),
+  shippingEmail: z.string().trim().email('Valid email is required').max(255),
+  shippingPhone: z.string().trim().min(6, 'Phone is required').max(32),
   shippingAddress: z.object({
-    addressLine: z.string(),
-    city: z.string(),
+    addressLine: z.string().min(3),
+    city: z.string().min(2),
     postalCode: z.string().optional(),
     country: z.string().default('India'),
   }),
   paymentMethod: z.string().default('concierge'),
-  notes: z.string().optional(),
+  notes: z.string().max(1000).optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -47,7 +51,7 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get('status');
     const search = searchParams.get('q');
 
-    const isAdmin = session.user.role === 'ADMIN';
+    const isAdmin = isUserAdmin(session.user);
 
     const where: any = {};
     if (!isAdmin) {
@@ -87,33 +91,78 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const parsed = createOrderSchema.parse(body);
 
-    const orderReference = `WL-ORD-${Math.floor(100000 + Math.random() * 900000)}`;
+    // 1. Fetch real products from database to calculate server-side prices
+    const productIds = parsed.items.map((i: any) => i.productId);
+    const dbProducts = await db.product.findMany({
+      where: { id: { in: productIds } },
+    });
+
+    const dbProductMap = new Map<string, any>(dbProducts.map((p: any) => [p.id, p]));
+
+    // 2. Inventory & Stock Validation
+    const inventoryCheck = await verifyAndReserveInventory(
+      parsed.items.map((item: any) => {
+        const prod = dbProductMap.get(item.productId);
+        return {
+          productId: item.productId,
+          name: prod?.name || item.productId,
+          quantity: item.quantity,
+        };
+      })
+    );
+
+    if (!inventoryCheck.success) {
+      return NextResponse.json({ error: inventoryCheck.error }, { status: 400 });
+    }
+
+    // 3. Compute Authoritative Total Server-Side
+    let computedTotal = 0;
+    const orderItemsToCreate = [];
+
+    for (const item of parsed.items) {
+      const dbProd = dbProductMap.get(item.productId);
+      if (!dbProd) {
+        return NextResponse.json(
+          { error: `Timepiece ${item.productId} was not found in our collection.` },
+          { status: 404 }
+        );
+      }
+
+      const strapAddon = item.strapOption?.price_addon ?? 0;
+      const unitPrice = dbProd.price + strapAddon;
+      const lineTotal = unitPrice * item.quantity;
+      computedTotal += lineTotal;
+
+      orderItemsToCreate.push({
+        productId: dbProd.id,
+        name: dbProd.name,
+        brand: dbProd.brand,
+        referenceNumber: dbProd.referenceNumber,
+        price: unitPrice,
+        quantity: item.quantity,
+        imageUrl: dbProd.images?.[0] ?? null,
+        strapOption: item.strapOption ? item.strapOption : undefined,
+      });
+    }
+
+    const orderReference = generateOrderReference();
 
     const order = await db.order.create({
       data: {
         orderReference,
         userId: session?.user?.id ?? null,
-        totalAmount: parsed.totalAmount,
+        totalAmount: computedTotal,
         currency: 'INR',
         status: 'PENDING',
         paymentStatus: 'UNPAID',
         paymentMethod: parsed.paymentMethod,
         shippingName: parsed.shippingName,
-        shippingEmail: parsed.shippingEmail,
+        shippingEmail: parsed.shippingEmail.toLowerCase().trim(),
         shippingPhone: parsed.shippingPhone,
         shippingAddress: parsed.shippingAddress,
         notes: parsed.notes,
         orderItems: {
-          create: parsed.items.map((item) => ({
-            productId: item.productId,
-            name: item.name,
-            brand: item.brand,
-            referenceNumber: item.referenceNumber,
-            price: item.price,
-            quantity: item.quantity,
-            imageUrl: item.imageUrl,
-            strapOption: item.strapOption ? item.strapOption : undefined,
-          })),
+          create: orderItemsToCreate,
         },
       },
       include: {
@@ -128,9 +177,9 @@ export async function POST(req: NextRequest) {
           userId: session.user.id,
           type: 'BOOKING_CONFIRMED',
           title: 'Order Confirmed',
-          body: `Your acquisition order #${order.orderReference} has been received. Our concierge is preparing dispatch.`,
+          body: `Your acquisition order #${order.orderReference} for ₹${computedTotal.toLocaleString('en-IN')} has been placed.`,
         },
-      }).catch((e) => console.warn('Order notification warning:', e));
+      }).catch((e: any) => console.warn('Order notification warning:', e));
     }
 
     return NextResponse.json({ order }, { status: 201 });

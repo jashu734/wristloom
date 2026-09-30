@@ -3,6 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { Search, Users, Eye, ArrowUpRight, ShoppingBag, Wrench, ShieldCheck, Mail, Phone, Calendar } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
 
 interface CustomerItem {
   id: string;
@@ -111,7 +112,7 @@ export function AdminCustomersClient({ initialCustomers }: { initialCustomers: C
                       </span>
                     </td>
                     <td className="px-5 py-4 text-[#B08D57] font-semibold">
-                      ₹{c.totalSpent.toLocaleString()}
+                      {formatCurrency(c.totalSpent)}
                     </td>
                     <td className="px-5 py-4 text-[rgba(237,230,214,0.40)]">
                       {new Date(c.joinedDate).toLocaleDateString('en-US', {

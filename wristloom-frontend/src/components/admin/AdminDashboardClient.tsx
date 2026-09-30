@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Eye,
 } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
 
 interface DashboardData {
   summary: {
@@ -89,7 +90,7 @@ export function AdminDashboardClient({ initialData }: { initialData: DashboardDa
   const summaryCards = [
     {
       title: 'Total Revenue',
-      value: `₹${(data.summary.totalRevenue || 0).toLocaleString()}`,
+      value: formatCurrency(data.summary.totalRevenue || 0),
       sub: 'Watch sales & atelier services',
       icon: DollarSign,
       color: 'text-[#B08D57]',
@@ -98,7 +99,7 @@ export function AdminDashboardClient({ initialData }: { initialData: DashboardDa
     },
     {
       title: 'Total Orders',
-      value: (data.summary.totalOrders || 0).toLocaleString(),
+      value: (data.summary.totalOrders || 0).toLocaleString('en-IN'),
       sub: `${data.summary.pendingOrders || 0} pending processing`,
       icon: ShoppingBag,
       color: 'text-amber-400',
@@ -107,7 +108,7 @@ export function AdminDashboardClient({ initialData }: { initialData: DashboardDa
     },
     {
       title: 'Total Customers',
-      value: (data.summary.totalCustomers || 0).toLocaleString(),
+      value: (data.summary.totalCustomers || 0).toLocaleString('en-IN'),
       sub: 'Verified collector accounts',
       icon: Users,
       color: 'text-blue-400',
@@ -116,7 +117,7 @@ export function AdminDashboardClient({ initialData }: { initialData: DashboardDa
     },
     {
       title: 'Master Technicians',
-      value: (data.summary.totalTechnicians || 0).toLocaleString(),
+      value: (data.summary.totalTechnicians || 0).toLocaleString('en-IN'),
       sub: `${data.summary.completedServices || 0} completed restorations`,
       icon: Wrench,
       color: 'text-emerald-400',
@@ -258,25 +259,25 @@ export function AdminDashboardClient({ initialData }: { initialData: DashboardDa
             <span className="font-mono text-[10px] tracking-widest uppercase text-[#B08D57]">
               {filteredRevenue.label}
             </span>
-            <p className="font-display text-3xl text-[#EDE6D6] mt-1">₹{filteredRevenue.value.toLocaleString()}</p>
+            <p className="font-display text-3xl text-[#EDE6D6] mt-1">{formatCurrency(filteredRevenue.value)}</p>
           </div>
           <div>
             <span className="font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.40)]">
               Today
             </span>
-            <p className="font-mono text-lg text-[#EDE6D6] mt-1">₹{data.revenueBreakdown.today.toLocaleString()}</p>
+            <p className="font-mono text-lg text-[#EDE6D6] mt-1">{formatCurrency(data.revenueBreakdown.today)}</p>
           </div>
           <div>
             <span className="font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.40)]">
               Last 7 Days
             </span>
-            <p className="font-mono text-lg text-[#EDE6D6] mt-1">₹{data.revenueBreakdown.week.toLocaleString()}</p>
+            <p className="font-mono text-lg text-[#EDE6D6] mt-1">{formatCurrency(data.revenueBreakdown.week)}</p>
           </div>
           <div>
             <span className="font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.40)]">
               Last 30 Days
             </span>
-            <p className="font-mono text-lg text-[#EDE6D6] mt-1">₹{data.revenueBreakdown.month.toLocaleString()}</p>
+            <p className="font-mono text-lg text-[#EDE6D6] mt-1">{formatCurrency(data.revenueBreakdown.month)}</p>
           </div>
         </div>
 
@@ -387,7 +388,7 @@ export function AdminDashboardClient({ initialData }: { initialData: DashboardDa
                       <td className="py-3 text-[rgba(237,230,214,0.70)]">
                         {order.shippingName || order.user?.name || 'Private Collector'}
                       </td>
-                      <td className="py-3 text-[#B08D57]">₹{order.totalAmount?.toLocaleString()}</td>
+                      <td className="py-3 text-[#B08D57]">{formatCurrency(order.totalAmount || 0)}</td>
                       <td className="py-3">
                         <span
                           className={`px-2 py-0.5 text-[9px] rounded-[1px] uppercase tracking-wider ${

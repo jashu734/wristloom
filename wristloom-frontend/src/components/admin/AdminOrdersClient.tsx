@@ -172,10 +172,17 @@ export function AdminOrdersClient({ initialOrders }: { initialOrders: any[] }) {
                     </td>
 
                     <td className="px-4 py-3 align-top">
-                      <div className="space-y-1">
+                      <div className="space-y-2">
                         {order.orderItems?.map((item) => (
-                          <div key={item.id} className="text-xs text-[rgba(237,230,214,0.70)]">
-                            <span className="font-mono text-[#B08D57] font-medium">{item.brand}</span> {item.name} (x{item.quantity})
+                          <div key={item.id} className="flex items-center gap-2 text-xs text-[rgba(237,230,214,0.70)]">
+                            {item.imageUrl && (
+                              <div className="w-8 h-8 rounded-[2px] bg-[#14110F] border border-[rgba(176,141,87,0.15)] p-0.5 flex-shrink-0 flex items-center justify-center">
+                                <img src={item.imageUrl} alt={item.name} className="w-full h-full object-contain" />
+                              </div>
+                            )}
+                            <div>
+                              <span className="font-mono text-[#B08D57] font-medium">{item.brand}</span> {item.name} (x{item.quantity})
+                            </div>
                           </div>
                         ))}
                       </div>

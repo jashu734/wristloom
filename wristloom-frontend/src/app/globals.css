@@ -202,7 +202,7 @@ img {
 }
 
 /* ─── Form Reset ─────────────────────────────────────────────── */
-input,
+input:not([type="checkbox"]):not([type="radio"]),
 textarea,
 select {
   background-color: var(--ash-surface);
@@ -216,12 +216,23 @@ select {
   font-size: 0.875rem;
 }
 
-input::placeholder,
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+  min-width: auto;
+  height: auto;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--aged-brass);
+}
+
+input:not([type="checkbox"]):not([type="radio"])::placeholder,
 textarea::placeholder {
   color: var(--text-muted);
 }
 
-input:focus,
+input:not([type="checkbox"]):not([type="radio"]):focus,
 textarea:focus,
 select:focus {
   outline: none;
@@ -280,5 +291,51 @@ button {
   .container-wl {
     padding-left: 3rem;
     padding-right: 3rem;
+  }
+}
+
+/* ─── Luxury Invoice & Passport Print Styles ─────────────────── */
+@media print {
+  @page {
+    margin: 1.5cm;
+    size: A4 portrait;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #111111 !important;
+    font-size: 11pt !important;
+  }
+
+  /* Hide navigation, sidebars, interactive controls during print */
+  header,
+  nav,
+  footer,
+  aside,
+  button,
+  a[href^="/admin"],
+  .no-print,
+  [data-print-hide="true"] {
+    display: none !important;
+  }
+
+  .print-surface {
+    background: #ffffff !important;
+    border: 1px solid #d1d5db !important;
+    color: #111111 !important;
+    box-shadow: none !important;
+    padding: 2rem !important;
+  }
+
+  .print-surface * {
+    color: #111111 !important;
+    border-color: #e5e7eb !important;
+  }
+
+  .print-header {
+    display: block !important;
+    border-bottom: 2px solid #111111 !important;
+    padding-bottom: 1rem !important;
+    margin-bottom: 1.5rem !important;
   }
 }

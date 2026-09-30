@@ -1,412 +1,449 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { formatCurrency } from '@/lib/utils';
-import { Plus, Edit2, Trash2, Check, X, Loader2, Package, Search } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Filter, ShieldAlert, CheckCircle2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/primitives/Button';
+import { WATCH_BRANDS } from '@/lib/constants';
 
 interface Product {
   id: string;
   slug: string;
   name: string;
+  modelName?: string | null;
   brand: string;
   referenceNumber: string | null;
   price: number;
-  stockCount: number;
-  inStock: boolean;
-  images: string[];
+  purchaseValue?: number | null;
+  caseSize?: string | null;
   movementType?: string | null;
-  condition: string;
+  stockCount: number;
+  stock?: number | null;
+  inStock: boolean;
+  isActive?: boolean;
+  images: string[];
+  imageUrl?: string | null;
+  condition?: string;
+  description?: string;
 }
 
-export function AdminProductsClient({ initialProducts }: { initialProducts: any[] }) {
+const MOVEMENT_TYPES = [
+  'Automatic',
+  'Manual Wind',
+  'Quartz',
+  'Solar',
+  'Eco-Drive',
+  'Automatic Chronograph',
+];
+
+export function AdminProductsClient({ initialProducts }: { initialProducts: Product[] }) {
   const [products, setProducts] = React.useState<Product[]>(initialProducts);
+
+  // Filters
   const [search, setSearch] = React.useState('');
-  const [isAdding, setIsAdding] = React.useState(false);
-  const [editingId, setEditingId] = React.useState<string | null>(null);
-  const [editPrice, setEditPrice] = React.useState<number>(0);
-  const [editStock, setEditStock] = React.useState<number>(0);
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [selectedBrand, setSelectedBrand] = React.useState('all');
+  const [selectedMovement, setSelectedMovement] = React.useState('all');
+  const [modelSearch, setModelSearch] = React.useState('');
+  const [refSearch, setRefSearch] = React.useState('');
 
-  // New product form
-  const [newForm, setNewForm] = React.useState({
-    name: '',
-    brand: '',
-    referenceNumber: '',
-    price: '',
-    description: '',
-    images: '',
-    stockCount: '1',
-    condition: 'New',
-  });
+  const [actionLoadingId, setActionLoadingId] = React.useState<string | null>(null);
+  const [feedbackMessage, setFeedbackMessage] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const filtered = products.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.brand.toLowerCase().includes(search.toLowerCase()) ||
-    (p.referenceNumber && p.referenceNumber.toLowerCase().includes(search.toLowerCase()))
-  );
+  // Filtered products list
+  const filteredProducts = React.useMemo(() => {
+    return products.filter((p) => {
+      const pModel = (p.modelName || p.name || '').toLowerCase();
+      const pBrand = (p.brand || '').toLowerCase();
+      const pRef = (p.referenceNumber || '').toLowerCase();
+      const pDesc = (p.description || '').toLowerCase();
+      const pMovement = (p.movementType || '').toLowerCase();
 
-  async function handleToggleStock(p: Product) {
-    const nextState = !p.inStock;
+      // Global search
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        const matchesGlobal =
+          pModel.includes(q) ||
+          pBrand.includes(q) ||
+          pRef.includes(q) ||
+          pDesc.includes(q);
+        if (!matchesGlobal) return false;
+      }
+
+      // Brand filter
+      if (selectedBrand !== 'all') {
+        if (pBrand !== selectedBrand.toLowerCase()) return false;
+      }
+
+      // Movement type filter
+      if (selectedMovement !== 'all') {
+        if (!pMovement.includes(selectedMovement.toLowerCase())) return false;
+      }
+
+      // Model name search
+      if (modelSearch.trim()) {
+        if (!pModel.includes(modelSearch.trim().toLowerCase())) return false;
+      }
+
+      // Reference number search
+      if (refSearch.trim()) {
+        if (!pRef.includes(refSearch.trim().toLowerCase())) return false;
+      }
+
+      return true;
+    });
+  }, [products, search, selectedBrand, selectedMovement, modelSearch, refSearch]);
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to deactivate or remove "${name}" from the active watch catalog?`)) {
+      return;
+    }
+
+    setActionLoadingId(id);
+    setFeedbackMessage(null);
+
+    try {
+      const res = await fetch(`/api/products/${id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to delete product');
+      }
+
+      if (data.softDeleted) {
+        // Soft-deactivated
+        setProducts((prev) =>
+          prev.map((item) => (item.id === id ? { ...item, isActive: false, inStock: false } : item))
+        );
+        setFeedbackMessage({
+          type: 'success',
+          text: `"${name}" deactivated. Historical order records preserved.`,
+        });
+      } else {
+        // Hard deleted
+        setProducts((prev) => prev.filter((item) => item.id !== id));
+        setFeedbackMessage({
+          type: 'success',
+          text: `"${name}" removed from watch catalog.`,
+        });
+      }
+    } catch (err: any) {
+      console.error(err);
+      setFeedbackMessage({
+        type: 'error',
+        text: err.message || 'Error executing product deletion',
+      });
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleToggleActive = async (p: Product) => {
+    const nextState = !(p.isActive !== false);
+    setActionLoadingId(p.id);
     try {
       const res = await fetch(`/api/products/${p.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ inStock: nextState }),
-      });
-      if (res.ok) {
-        setProducts((prev) => prev.map((item) => (item.id === p.id ? { ...item, inStock: nextState } : item)));
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
-  async function handleSaveQuickEdit(id: string) {
-    setIsSubmitting(true);
-    try {
-      const res = await fetch(`/api/products/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ price: Number(editPrice), stockCount: Number(editStock) }),
+        body: JSON.stringify({ isActive: nextState, inStock: nextState }),
       });
       if (res.ok) {
         setProducts((prev) =>
-          prev.map((item) => (item.id === id ? { ...item, price: Number(editPrice), stockCount: Number(editStock) } : item))
+          prev.map((item) => (item.id === p.id ? { ...item, isActive: nextState, inStock: nextState } : item))
         );
-        setEditingId(null);
+        setFeedbackMessage({
+          type: 'success',
+          text: `Catalog status updated to ${nextState ? 'Active' : 'Inactive'}`,
+        });
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setFeedbackMessage({ type: 'error', text: 'Failed to update catalog status' });
     } finally {
-      setIsSubmitting(false);
+      setActionLoadingId(null);
     }
-  }
-
-  async function handleDelete(id: string) {
-    if (!confirm('Are you sure you want to remove this timepiece from the active catalog?')) return;
-    try {
-      const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setProducts((prev) => prev.filter((item) => item.id !== id));
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
-  async function handleCreateProduct(e: React.FormEvent) {
-    e.preventDefault();
-    setIsSubmitting(true);
-
-    try {
-      const imagesArr = newForm.images
-        ? newForm.images.split('\n').map((url) => url.trim()).filter(Boolean)
-        : ['https://images.unsplash.com/photo-1547996160-81dfa63595aa?w=800&q=90'];
-
-      const payload = {
-        name: newForm.name,
-        brand: newForm.brand,
-        referenceNumber: newForm.referenceNumber || undefined,
-        price: Number(newForm.price),
-        description: newForm.description,
-        images: imagesArr,
-        stockCount: Number(newForm.stockCount) || 1,
-        condition: newForm.condition,
-        inStock: true,
-      };
-
-      const res = await fetch('/api/products', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error ?? 'Failed to create product');
-      }
-
-      setProducts((prev) => [data.product, ...prev]);
-      setIsAdding(false);
-      setNewForm({
-        name: '',
-        brand: '',
-        referenceNumber: '',
-        price: '',
-        description: '',
-        images: '',
-        stockCount: '1',
-        condition: 'New',
-      });
-    } catch (err: any) {
-      alert(err.message || 'Error creating timepiece');
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
+  };
 
   return (
     <div className="space-y-6">
-      {/* Top action row */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="relative flex-1 min-w-[240px] max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[rgba(237,230,214,0.30)]" />
-          <input
-            type="text"
-            placeholder="Search watches by name, brand, or reference..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[#1E1A17] border border-[rgba(176,141,87,0.15)] rounded-[2px] pl-9 pr-4 py-2 text-xs text-[#EDE6D6] placeholder:text-[rgba(237,230,214,0.30)] focus:border-[#B08D57] focus:outline-none"
-          />
-        </div>
-        <Button variant="primary" size="sm" onClick={() => setIsAdding(true)}>
-          <Plus className="w-4 h-4 mr-1.5" /> Add Timepiece
-        </Button>
-      </div>
-
-      {/* Add Modal */}
-      {isAdding && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="bg-[#1E1A17] border border-[rgba(176,141,87,0.25)] rounded-[2px] max-w-lg w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4 border-b border-[rgba(176,141,87,0.10)] pb-3">
-              <h2 className="font-display text-xl text-[#EDE6D6]">Catalog New Timepiece</h2>
-              <button onClick={() => setIsAdding(false)} className="text-[rgba(237,230,214,0.40)] hover:text-[#EDE6D6]">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateProduct} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-widest text-[#B08D57] mb-1">Brand</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Rolex, Omega"
-                    value={newForm.brand}
-                    onChange={(e) => setNewForm({ ...newForm, brand: e.target.value })}
-                    className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.15)] rounded px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-widest text-[#B08D57] mb-1">Model Name</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Submariner Date"
-                    value={newForm.name}
-                    onChange={(e) => setNewForm({ ...newForm, name: e.target.value })}
-                    className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.15)] rounded px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-widest text-[#B08D57] mb-1">Reference Number</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 126610LN"
-                    value={newForm.referenceNumber}
-                    onChange={(e) => setNewForm({ ...newForm, referenceNumber: e.target.value })}
-                    className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.15)] rounded px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-widest text-[#B08D57] mb-1">Price (INR)</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="e.g. 1450000"
-                    value={newForm.price}
-                    onChange={(e) => setNewForm({ ...newForm, price: e.target.value })}
-                    className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.15)] rounded px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-widest text-[#B08D57] mb-1">Stock Count</label>
-                  <input
-                    type="number"
-                    required
-                    value={newForm.stockCount}
-                    onChange={(e) => setNewForm({ ...newForm, stockCount: e.target.value })}
-                    className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.15)] rounded px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-widest text-[#B08D57] mb-1">Condition</label>
-                  <select
-                    value={newForm.condition}
-                    onChange={(e) => setNewForm({ ...newForm, condition: e.target.value })}
-                    className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.15)] rounded px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
-                  >
-                    <option value="New">New / Unworn</option>
-                    <option value="Certified Pre-Owned">Certified Pre-Owned</option>
-                    <option value="Vintage">Vintage Museum</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-widest text-[#B08D57] mb-1">Description</label>
-                <textarea
-                  required
-                  rows={3}
-                  placeholder="Horological narrative and technical highlights..."
-                  value={newForm.description}
-                  onChange={(e) => setNewForm({ ...newForm, description: e.target.value })}
-                  className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.15)] rounded px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-widest text-[#B08D57] mb-1">Image URLs (one per line)</label>
-                <textarea
-                  rows={2}
-                  placeholder="https://images.unsplash.com/..."
-                  value={newForm.images}
-                  onChange={(e) => setNewForm({ ...newForm, images: e.target.value })}
-                  className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.15)] rounded px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none font-mono"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-[rgba(176,141,87,0.10)] flex justify-end gap-3">
-                <Button type="button" variant="ghost" size="sm" onClick={() => setIsAdding(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" variant="primary" size="sm" loading={isSubmitting}>
-                  Save Timepiece
-                </Button>
-              </div>
-            </form>
+      {/* Top Banner & Notifications */}
+      {feedbackMessage && (
+        <div
+          className={`p-3.5 rounded-[2px] border text-xs flex items-center justify-between gap-2.5 ${
+            feedbackMessage.type === 'success'
+              ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-300'
+              : 'bg-red-950/40 border-red-800/60 text-red-300'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {feedbackMessage.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            ) : (
+              <ShieldAlert className="w-4 h-4 text-red-400 flex-shrink-0" />
+            )}
+            <span>{feedbackMessage.text}</span>
           </div>
+          <button
+            onClick={() => setFeedbackMessage(null)}
+            className="text-xs opacity-60 hover:opacity-100 font-mono"
+          >
+            Dismiss
+          </button>
         </div>
       )}
 
-      {/* Table */}
-      <div className="bg-[#1E1A17] border border-[rgba(176,141,87,0.10)] rounded-[2px] overflow-hidden">
+      {/* Action Row & Global Search */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="relative flex-1 min-w-[260px] max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[rgba(237,230,214,0.30)]" />
+          <input
+            type="text"
+            placeholder="Global search (brand, model, ref, description)..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-[#1E1A17] border border-[rgba(176,141,87,0.15)] rounded-[2px] pl-9 pr-4 py-2.5 text-xs text-[#EDE6D6] placeholder:text-[rgba(237,230,214,0.30)] focus:border-[#B08D57] focus:outline-none"
+          />
+        </div>
+
+        <Link
+          href="/admin/products/add"
+          className="flex items-center gap-2 px-4 py-2.5 bg-[#B08D57] text-[#14110F] text-xs font-mono tracking-wider uppercase font-semibold rounded-[2px] hover:bg-[#c29f68] transition-colors shadow-sm"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Add Watch</span>
+        </Link>
+      </div>
+
+      {/* Filter Bar with Brand, Movement, Model Search, Reference Search */}
+      <div className="bg-[#1E1A17] border border-[rgba(176,141,87,0.15)] p-4 rounded-[2px] space-y-3">
+        <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-[#B08D57] mb-1">
+          <Filter className="w-3.5 h-3.5" />
+          <span>Catalog Filters & Search</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Brand Filter */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase tracking-wider text-[rgba(237,230,214,0.50)] mb-1">
+              Brand Filter (12 Brands)
+            </label>
+            <select
+              value={selectedBrand}
+              onChange={(e) => setSelectedBrand(e.target.value)}
+              className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.20)] rounded-[2px] px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
+            >
+              <option value="all">All Brands (12 Authorized)</option>
+              {WATCH_BRANDS.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Movement Type Filter */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase tracking-wider text-[rgba(237,230,214,0.50)] mb-1">
+              Movement Type Filter
+            </label>
+            <select
+              value={selectedMovement}
+              onChange={(e) => setSelectedMovement(e.target.value)}
+              className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.20)] rounded-[2px] px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
+            >
+              <option value="all">All Movement Types</option>
+              {MOVEMENT_TYPES.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Model Search */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase tracking-wider text-[rgba(237,230,214,0.50)] mb-1">
+              Model Search
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. Presage, Edge..."
+              value={modelSearch}
+              onChange={(e) => setModelSearch(e.target.value)}
+              className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.20)] rounded-[2px] px-3 py-2 text-xs text-[#EDE6D6] placeholder:text-[rgba(237,230,214,0.30)] focus:border-[#B08D57] focus:outline-none"
+            />
+          </div>
+
+          {/* Reference Number Search */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase tracking-wider text-[rgba(237,230,214,0.50)] mb-1">
+              Reference Number Search
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. SRPB43J1, 1595..."
+              value={refSearch}
+              onChange={(e) => setRefSearch(e.target.value)}
+              className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.20)] rounded-[2px] px-3 py-2 text-xs text-[#EDE6D6] placeholder:text-[rgba(237,230,214,0.30)] focus:border-[#B08D57] focus:outline-none font-mono"
+            />
+          </div>
+        </div>
+
+        {/* Active filter count & reset */}
+        {(selectedBrand !== 'all' || selectedMovement !== 'all' || modelSearch || refSearch || search) && (
+          <div className="flex items-center justify-between pt-2 border-t border-[rgba(176,141,87,0.08)]">
+            <span className="text-[11px] font-mono text-[rgba(237,230,214,0.50)]">
+              Showing {filteredProducts.length} of {products.length} catalog timepieces
+            </span>
+            <button
+              onClick={() => {
+                setSearch('');
+                setSelectedBrand('all');
+                setSelectedMovement('all');
+                setModelSearch('');
+                setRefSearch('');
+              }}
+              className="flex items-center gap-1 text-[11px] font-mono text-[#B08D57] hover:underline"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Reset Filters</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Catalog Table */}
+      <div className="bg-[#1E1A17] border border-[rgba(176,141,87,0.15)] rounded-[2px] overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead>
-              <tr className="border-b border-[rgba(176,141,87,0.10)] bg-[rgba(20,17,15,0.40)]">
-                {['Watch', 'Reference', 'Condition', 'Price', 'Inventory', 'Status', 'Actions'].map((h) => (
-                  <th key={h} className="font-mono text-[9px] tracking-widest uppercase text-[rgba(237,230,214,0.40)] px-4 py-3">{h}</th>
-                ))}
+              <tr className="border-b border-[rgba(176,141,87,0.12)] bg-[rgba(20,17,15,0.60)]">
+                <th className="font-mono text-[9px] tracking-widest uppercase text-[rgba(237,230,214,0.40)] px-4 py-3">Watch & Model</th>
+                <th className="font-mono text-[9px] tracking-widest uppercase text-[rgba(237,230,214,0.40)] px-4 py-3">Reference</th>
+                <th className="font-mono text-[9px] tracking-widest uppercase text-[rgba(237,230,214,0.40)] px-4 py-3">Case Size</th>
+                <th className="font-mono text-[9px] tracking-widest uppercase text-[rgba(237,230,214,0.40)] px-4 py-3">Movement</th>
+                <th className="font-mono text-[9px] tracking-widest uppercase text-[rgba(237,230,214,0.40)] px-4 py-3">Purchase Value</th>
+                <th className="font-mono text-[9px] tracking-widest uppercase text-[rgba(237,230,214,0.40)] px-4 py-3">Stock</th>
+                <th className="font-mono text-[9px] tracking-widest uppercase text-[rgba(237,230,214,0.40)] px-4 py-3">Status</th>
+                <th className="font-mono text-[9px] tracking-widest uppercase text-[rgba(237,230,214,0.40)] px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[rgba(176,141,87,0.06)]">
-              {filtered.map((p) => {
-                const isEditingThis = editingId === p.id;
-                return (
-                  <tr key={p.id} className="hover:bg-[rgba(176,141,87,0.04)] transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={p.images?.[0] || 'https://images.unsplash.com/photo-1524805444758-089113d48a6d?w=200&q=80'}
-                          alt={p.name}
-                          className="w-10 h-10 object-cover rounded-[2px] border border-[rgba(176,141,87,0.15)] flex-shrink-0"
-                        />
-                        <div>
-                          <p className="font-mono text-[9px] uppercase tracking-wider text-[#B08D57]">{p.brand}</p>
-                          <p className="text-sm font-medium text-[#EDE6D6]">{p.name}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 font-mono text-[11px] text-[rgba(237,230,214,0.45)]">
-                      {p.referenceNumber || '—'}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-[rgba(237,230,214,0.60)]">
-                      {p.condition}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-sm">
-                      {isEditingThis ? (
-                        <input
-                          type="number"
-                          value={editPrice}
-                          onChange={(e) => setEditPrice(Number(e.target.value))}
-                          className="w-28 bg-[#14110F] border border-[#B08D57] rounded px-2 py-1 text-xs text-[#EDE6D6]"
-                        />
-                      ) : (
-                        <span className="text-[#EDE6D6] font-semibold">{formatCurrency(p.price)}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs">
-                      {isEditingThis ? (
-                        <input
-                          type="number"
-                          value={editStock}
-                          onChange={(e) => setEditStock(Number(e.target.value))}
-                          className="w-16 bg-[#14110F] border border-[#B08D57] rounded px-2 py-1 text-xs text-[#EDE6D6]"
-                        />
-                      ) : (
-                        <span className={p.stockCount <= 1 ? 'text-amber-400' : 'text-[rgba(237,230,214,0.60)]'}>
-                          {p.stockCount} units
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => handleToggleStock(p)}
-                        className={`font-mono text-[9px] uppercase tracking-wider px-2 py-1 rounded-[1px] border transition-colors ${
-                          p.inStock
-                            ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20'
-                            : 'text-red-400 border-red-500/30 bg-red-500/10 hover:bg-red-500/20'
-                        }`}
-                      >
-                        {p.inStock ? 'In Stock' : 'Out of Stock'}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        {isEditingThis ? (
-                          <>
-                            <button
-                              onClick={() => handleSaveQuickEdit(p.id)}
-                              disabled={isSubmitting}
-                              className="p-1.5 text-emerald-400 hover:text-emerald-300"
-                              title="Save"
-                            >
-                              <Check className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => setEditingId(null)}
-                              className="p-1.5 text-zinc-400 hover:text-zinc-300"
-                              title="Cancel"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              onClick={() => {
-                                setEditingId(p.id);
-                                setEditPrice(p.price);
-                                setEditStock(p.stockCount);
+              {filteredProducts.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center text-xs text-[rgba(237,230,214,0.40)]">
+                    No timepieces found matching the selected search criteria.
+                  </td>
+                </tr>
+              ) : (
+                filteredProducts.map((p) => {
+                  const imageSrc =
+                    p.imageUrl || (p.images && p.images.length > 0 ? p.images[0] : '/watches/placeholder-watch.svg');
+                  const purchaseVal = p.purchaseValue ?? p.price;
+                  const stockQty = p.stock ?? p.stockCount;
+                  const isDeactivated = p.isActive === false;
+
+                  return (
+                    <tr
+                      key={p.id}
+                      className={`hover:bg-[rgba(176,141,87,0.04)] transition-colors ${
+                        isDeactivated ? 'opacity-60 bg-[rgba(20,17,15,0.30)]' : ''
+                      }`}
+                    >
+                      {/* Watch Image & Name */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-[2px] border border-[rgba(176,141,87,0.18)] bg-[#14110F] flex items-center justify-center p-1 flex-shrink-0">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={imageSrc}
+                              alt={p.name}
+                              className="w-full h-full object-contain"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/watches/placeholder-watch.svg';
                               }}
-                              className="p-1.5 text-[rgba(237,230,214,0.40)] hover:text-[#B08D57] transition-colors"
-                              title="Edit Price & Stock"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(p.id)}
-                              className="p-1.5 text-[rgba(237,230,214,0.40)] hover:text-red-400 transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                            />
+                          </div>
+                          <div>
+                            <span className="font-mono text-[9px] uppercase tracking-wider text-[#B08D57] block">
+                              {p.brand}
+                            </span>
+                            <p className="text-xs font-medium text-[#EDE6D6] font-display">
+                              {p.modelName || p.name}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Reference Number */}
+                      <td className="px-4 py-3 font-mono text-[11px] text-[rgba(237,230,214,0.65)]">
+                        {p.referenceNumber || '—'}
+                      </td>
+
+                      {/* Case Size */}
+                      <td className="px-4 py-3 text-xs text-[rgba(237,230,214,0.65)]">
+                        {p.caseSize || '—'}
+                      </td>
+
+                      {/* Movement */}
+                      <td className="px-4 py-3 text-xs text-[rgba(237,230,214,0.65)]">
+                        {p.movementType || '—'}
+                      </td>
+
+                      {/* Purchase Value */}
+                      <td className="px-4 py-3 font-mono text-xs text-[#EDE6D6] font-semibold">
+                        {formatCurrency(purchaseVal)}
+                      </td>
+
+                      {/* Stock */}
+                      <td className="px-4 py-3 font-mono text-xs">
+                        <span className={stockQty <= 2 ? 'text-amber-400 font-semibold' : 'text-[rgba(237,230,214,0.65)]'}>
+                          {stockQty} units
+                        </span>
+                      </td>
+
+                      {/* Status Toggle */}
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => handleToggleActive(p)}
+                          disabled={actionLoadingId === p.id}
+                          className={`font-mono text-[9px] uppercase tracking-wider px-2 py-1 rounded-[1px] border transition-colors ${
+                            !isDeactivated
+                              ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20'
+                              : 'text-zinc-400 border-zinc-700 bg-zinc-800/40 hover:bg-zinc-800'
+                          }`}
+                          title="Click to toggle catalog visibility"
+                        >
+                          {!isDeactivated ? 'Active' : 'Deactivated'}
+                        </button>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Link
+                            href={`/admin/products/edit/${p.id}`}
+                            className="p-1.5 text-[rgba(237,230,214,0.50)] hover:text-[#B08D57] transition-colors rounded-[1px] border border-transparent hover:border-[rgba(176,141,87,0.30)]"
+                            title="Edit Product"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </Link>
+                          <button
+                            onClick={() => handleDelete(p.id, p.modelName || p.name)}
+                            disabled={actionLoadingId === p.id}
+                            className="p-1.5 text-[rgba(237,230,214,0.50)] hover:text-red-400 transition-colors rounded-[1px] border border-transparent hover:border-red-500/30"
+                            title="Delete or Deactivate Product"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

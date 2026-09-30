@@ -16,8 +16,11 @@ dist/
 .env.production
 .env.development
 cookie.txt
+cookies.txt
+cookies*.txt
 *.pem
 *.key
+scratch/
 
 # Debug logs
 npm-debug.log*
@@ -30,6 +33,7 @@ yarn-error.log*
 Thumbs.db
 *.swp
 *.swo
+.vscode/
 
 # TypeScript cache
 *.tsbuildinfo

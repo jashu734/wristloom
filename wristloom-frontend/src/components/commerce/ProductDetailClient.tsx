@@ -11,6 +11,9 @@ import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/store/cartStore';
 import { useWishlistStore } from '@/store/wishlistStore';
 
+import { HorologicalLoupe } from './HorologicalLoupe';
+import { WristSizeVisualizer } from './WristSizeVisualizer';
+
 interface ProductDetailClientProps {
   product: Product;
 }
@@ -19,7 +22,7 @@ interface ProductDetailClientProps {
 export function ProductDetailClient({ product }: ProductDetailClientProps) {
   const router = useRouter();
   const [selectedImage, setSelectedImage] = React.useState(0);
-  const [selectedStrap, setSelectedStrap] = React.useState(product.strap_options[0]);
+  const [selectedStrap, setSelectedStrap] = React.useState(product.strap_options?.[0]);
   const [added, setAdded] = React.useState(false);
   const addItem = useCartStore((s) => s.addItem);
   const isInWishlist = useWishlistStore((s) => s.isInWishlist(product.id));
@@ -31,11 +34,16 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
     addItem({
       id: product.id,
       slug: product.slug,
-      name: product.name,
+      name: product.modelName || product.name,
       brand: product.brand,
-      reference_number: product.reference_number,
-      price: product.price,
-      image: product.images[0],
+      reference_number: product.referenceNumber || product.reference_number,
+      referenceNumber: product.referenceNumber || product.reference_number,
+      price: product.purchaseValue ?? product.price,
+      purchaseValue: product.purchaseValue ?? product.price,
+      image: product.imageUrl || product.images?.[0] || '/watches/placeholder-watch.svg',
+      caseSize: product.caseSize || product.case_size,
+      movementType: product.movementType || product.movement_type,
+      stock: product.stock,
       strapOption: selectedStrap ? { id: selectedStrap.id, material: selectedStrap.material, price_addon: selectedStrap.price_addon } : undefined,
     });
     setAdded(true);
@@ -81,38 +89,14 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
 
-          {/* ─── Image Gallery ──────────────────────────── */}
+          {/* ─── Image Gallery & Horological Loupe ──────────────────────────── */}
           <div className="space-y-4">
-            {/* Main image */}
-            <div className="relative aspect-square bg-[#1E1A17] border border-[rgba(176,141,87,0.10)] rounded-[2px] overflow-hidden group">
-              <img
-                src={product.images[selectedImage]}
-                alt={`${product.brand} ${product.name} — view ${selectedImage + 1}`}
-                className="w-full h-full object-cover"
-              />
-
-              {/* Navigation arrows */}
-              {product.images.length > 1 && (
-                <>
-                  <button
-                    onClick={() => setSelectedImage((i) => Math.max(0, i - 1))}
-                    disabled={selectedImage === 0}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-[rgba(20,17,15,0.70)] border border-[rgba(176,141,87,0.20)] rounded-[2px] flex items-center justify-center text-[#EDE6D6] opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-0"
-                    aria-label="Previous image"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setSelectedImage((i) => Math.min(product.images.length - 1, i + 1))}
-                    disabled={selectedImage === product.images.length - 1}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-[rgba(20,17,15,0.70)] border border-[rgba(176,141,87,0.20)] rounded-[2px] flex items-center justify-center text-[#EDE6D6] opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-0"
-                    aria-label="Next image"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </>
-              )}
-            </div>
+            <HorologicalLoupe
+              imageSrc={product.images[selectedImage]}
+              alt={`${product.brand} ${product.name} — view ${selectedImage + 1}`}
+              movementType={product.movement_type}
+              movementCaliber={product.movement_caliber}
+            />
 
             {/* Thumbnails */}
             {product.images.length > 1 && (
@@ -121,7 +105,7 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
                   <button
                     key={i}
                     onClick={() => setSelectedImage(i)}
-                    className={`w-16 h-16 flex-shrink-0 rounded-[2px] overflow-hidden border transition-all ${
+                    className={`w-16 h-16 flex-shrink-0 rounded-[2px] overflow-hidden border transition-all cursor-pointer ${
                       selectedImage === i
                         ? 'border-[#B08D57]'
                         : 'border-[rgba(176,141,87,0.10)] hover:border-[rgba(176,141,87,0.30)]'
@@ -129,7 +113,7 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
                     aria-label={`View image ${i + 1}`}
                     aria-pressed={selectedImage === i}
                   >
-                    <img src={img} alt="" className="w-full h-full object-cover" />
+                    <img src={img} alt="" className="w-full h-full object-contain p-1 bg-[#14110F]" />
                   </button>
                 ))}
               </div>
@@ -139,34 +123,63 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
           {/* ─── Product Info ────────────────────────────── */}
           <div>
             {/* Brand + badges */}
-            <div className="flex items-center gap-3 mb-4">
-              <span className="font-mono text-xs tracking-widest uppercase text-[#B08D57]">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="font-mono text-xs tracking-widest uppercase text-[#B08D57] font-semibold">
                 {product.brand}
               </span>
               <Badge variant={product.condition === 'New' ? 'brass' : 'certified'}>
-                {product.condition}
+                {product.condition || 'New'}
               </Badge>
-              {product.collection && (
-                <span className="font-mono text-[10px] tracking-wider uppercase text-[rgba(237,230,214,0.35)]">
-                  {product.collection}
-                </span>
-              )}
+              {/* Stock availability */}
+              <span className={`font-mono text-[10px] tracking-wider uppercase px-2 py-0.5 rounded border ${
+                (product.stock ?? 5) > 0 && product.in_stock
+                  ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-400'
+                  : 'bg-red-950/40 border-red-800/60 text-red-400'
+              }`}>
+                {(product.stock ?? 5) > 0 && product.in_stock
+                  ? `In Stock (${product.stock ?? 5} available)`
+                  : 'Out of Stock'}
+              </span>
             </div>
 
-            {/* Name */}
+            {/* Model Name */}
             <h1 className="font-display text-3xl md:text-4xl text-[#EDE6D6] tracking-tight mb-2">
-              {product.name}
+              {product.modelName || product.name}
             </h1>
 
-            {/* Reference in mono */}
-            <p className="font-mono text-sm tracking-widest uppercase text-[rgba(237,230,214,0.40)] mb-6">
-              Ref. {product.reference_number}
+            {/* Reference Number */}
+            <p className="font-mono text-sm tracking-widest uppercase text-[rgba(237,230,214,0.40)] mb-3">
+              Ref. {product.referenceNumber || product.reference_number}
             </p>
 
-            {/* Price */}
-            <p className="font-mono text-2xl text-[#B08D57] mb-6">
-              {formatCurrency(totalPrice)}
-            </p>
+            {/* Case Size & Movement Type Quick Badges */}
+            <div className="flex items-center gap-2 mb-6 font-mono text-xs text-[rgba(237,230,214,0.70)]">
+              <span className="bg-[#1E1A17] border border-[rgba(176,141,87,0.20)] px-2.5 py-1 rounded">
+                Case: {product.caseSize || product.case_size}
+              </span>
+              <span>·</span>
+              <span className="bg-[#1E1A17] border border-[rgba(176,141,87,0.20)] px-2.5 py-1 rounded">
+                Movement: {product.movementType || product.movement_type}
+              </span>
+            </div>
+
+            {/* Purchase Value & Wrist Fit Simulator */}
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-6 p-4 bg-[#1E1A17] border border-[rgba(176,141,87,0.15)] rounded-[2px]">
+              <div>
+                <span className="block font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.45)] mb-0.5">
+                  Purchase Value
+                </span>
+                <p className="font-mono text-2xl text-[#B08D57] font-semibold">
+                  {formatCurrency(totalPrice)}
+                </p>
+              </div>
+              <WristSizeVisualizer
+                watchName={product.modelName || product.name}
+                brand={product.brand}
+                caseSize={product.caseSize || product.case_size}
+                caseThickness={product.caseThickness || product.case_thickness}
+              />
+            </div>
 
             <div className="divider mb-6" />
 
@@ -176,7 +189,7 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
             </p>
 
             {/* Strap selection */}
-            {product.strap_options.length > 1 && (
+            {product.strap_options && product.strap_options.length > 1 && (
               <div className="mb-6">
                 <h2 className="font-mono text-[11px] tracking-widest uppercase text-[rgba(237,230,214,0.45)] mb-3">
                   Strap / Bracelet

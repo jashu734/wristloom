@@ -67,21 +67,18 @@ export const metadata: Metadata = {
 };
 
 // ─── Root Layout ─────────────────────────────────────────────
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Pass session to client-side SessionProvider
-  const session = await auth();
-
   return (
     <html
       lang="en"
       className={`${fraunces.variable} ${inter.variable} ${ibmPlexMono.variable} h-full`}
     >
       <body className="min-h-full flex flex-col antialiased">
-        <SessionProvider session={session}>
+        <SessionProvider>
           {children}
         </SessionProvider>
       </body>

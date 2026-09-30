@@ -92,11 +92,11 @@ export default function WishlistPage() {
                   >
                     <div>
                       {/* Image */}
-                      <Link href={`/products/${item.slug}`} className="block relative aspect-square bg-[#14110F] overflow-hidden">
+                      <Link href={`/products/${item.slug}`} className="block relative aspect-square bg-[#14110F] p-4 overflow-hidden flex items-center justify-center">
                         <img
                           src={item.image}
                           alt={`${item.brand} ${item.name}`}
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
                         />
                         <button
                           type="button"

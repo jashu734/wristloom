@@ -1,20 +1,23 @@
 // ============================================================
 // Wristloom — Reviews API Route (Next.js)
 // Handles reading and posting authentic verified reviews
+// Prevents duplicate spam and unearned service count increments
 // ============================================================
+
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { auth } from '@/lib/auth';
+import { isUserAdmin } from '@/lib/roles';
 
 const reviewSchema = z.object({
   technicianId: z.string().min(1, 'Technician ID required'),
-  bookingId: z.string().optional(),
+  bookingId: z.string().min(1, 'A valid completed booking reference is required to review'),
   rating: z.number().int().min(1).max(5),
-  title: z.string().min(3, 'Title required (min 3 chars)'),
-  body: z.string().min(10, 'Review body required (min 10 chars)'),
-  serviceType: z.string().min(1, 'Service type required'),
-  watchBrand: z.string().optional(),
+  title: z.string().trim().min(3, 'Title required (min 3 chars)').max(120),
+  body: z.string().trim().min(10, 'Review body required (min 10 chars)').max(2000),
+  serviceType: z.string().trim().min(1, 'Service type required').max(100),
+  watchBrand: z.string().trim().max(100).optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -64,22 +67,57 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Technician not found' }, { status: 404 });
     }
 
-    // Create review
+    // Check that caller had a COMPLETED booking with this technician
+    const isAdmin = isUserAdmin(session.user);
+    const booking = await db.repairBooking.findFirst({
+      where: {
+        id: data.bookingId,
+        technicianId: data.technicianId,
+        ...(isAdmin ? {} : { customerId: session.user.id }),
+      },
+    });
+
+    if (!booking) {
+      return NextResponse.json(
+        { error: 'No matching service booking found for this technician.' },
+        { status: 404 }
+      );
+    }
+
+    if (booking.status !== 'COMPLETED' && !isAdmin) {
+      return NextResponse.json(
+        { error: 'Reviews can only be submitted after the service has been completed.' },
+        { status: 400 }
+      );
+    }
+
+    // Check for existing review for this booking to prevent review spamming
+    const existingReview = await db.review.findFirst({
+      where: { bookingId: data.bookingId },
+    });
+    if (existingReview) {
+      return NextResponse.json(
+        { error: 'A review has already been submitted for this service appointment.' },
+        { status: 409 }
+      );
+    }
+
+    // Create authentic verified review
     const review = await db.review.create({
       data: {
         technicianId: data.technicianId,
         customerId: session.user.id,
-        bookingId: data.bookingId ?? null,
+        bookingId: data.bookingId,
         rating: data.rating,
         title: data.title,
         body: data.body,
-        serviceType: data.serviceType,
-        watchBrand: data.watchBrand ?? null,
+        serviceType: data.serviceType || booking.serviceType,
+        watchBrand: data.watchBrand || booking.watchBrand || null,
         verified: true,
       },
     });
 
-    // Recalculate technician rating average
+    // Recalculate technician rating average accurately without inflating completedServices
     const allTechReviews = await db.review.findMany({
       where: { technicianId: data.technicianId },
       select: { rating: true },
@@ -94,13 +132,15 @@ export async function POST(req: NextRequest) {
       where: { id: data.technicianId },
       data: {
         rating: Math.round(avgRating * 100) / 100,
-        completedServices: { increment: 1 },
       },
     });
 
     return NextResponse.json(review, { status: 201 });
   } catch (err: any) {
+    if (err instanceof z.ZodError) {
+      return NextResponse.json({ error: err.errors[0]?.message ?? 'Invalid review data' }, { status: 400 });
+    }
     console.error('[Review POST Error]', err);
-    return NextResponse.json({ error: err.message ?? 'Failed to submit review' }, { status: 400 });
+    return NextResponse.json({ error: err.message ?? 'Failed to submit review' }, { status: 500 });
   }
 }

@@ -1,8 +1,6 @@
 // ============================================================
 // Wristloom Frontend — NextAuth.js v5 Configuration
 // Manages session cookies, OAuth redirects, JWT strategy
-// DB access is only for auth (PrismaAdapter) — all other
-// business logic lives in the backend (Express, port 4000)
 // ============================================================
 
 import NextAuth, { type DefaultSession } from 'next-auth';
@@ -11,8 +9,7 @@ import Credentials from 'next-auth/providers/credentials';
 import Google from 'next-auth/providers/google';
 import bcrypt from 'bcryptjs';
 import { db } from '@/lib/db';
-
-type UserRole = 'CUSTOMER' | 'TECHNICIAN' | 'ADMIN';
+import { isAdminEmail, UserRole } from '@/lib/roles';
 
 declare module 'next-auth' {
   interface Session {
@@ -21,19 +18,28 @@ declare module 'next-auth' {
   interface User { role: UserRole; phone?: string | null }
 }
 
+function sanitizeAvatar(url?: string | null): string | null {
+  if (!url) return null;
+  // Strip large data URLs to prevent JWT cookie bloat (>4KB breaks HTTP requests)
+  if (url.startsWith('data:') || url.length > 2048) {
+    return null;
+  }
+  return url;
+}
+
 function CustomAuthAdapter(prisma: typeof db) {
   const baseAdapter = PrismaAdapter(prisma);
   return {
     ...baseAdapter,
     async createUser(data: any) {
       const emailLower = data.email?.toLowerCase().trim();
-      const isDedicatedAdmin = emailLower === 'wristloom@gmail.com';
+      const isDedicatedAdmin = isAdminEmail(emailLower);
       const user = await prisma.user.create({
         data: {
           name: data.name ?? null,
           email: emailLower,
           emailVerified: data.emailVerified ?? null,
-          profileImage: data.image ?? data.profileImage ?? null,
+          profileImage: sanitizeAvatar(data.image ?? data.profileImage),
           role: isDedicatedAdmin ? 'ADMIN' : 'CUSTOMER',
         },
       });
@@ -52,8 +58,8 @@ function CustomAuthAdapter(prisma: typeof db) {
       if (data.name !== undefined) updateData.name = data.name;
       if (data.email !== undefined) updateData.email = data.email?.toLowerCase().trim();
       if (data.emailVerified !== undefined) updateData.emailVerified = data.emailVerified;
-      if (data.image !== undefined) updateData.profileImage = data.image;
-      if (data.profileImage !== undefined) updateData.profileImage = data.profileImage;
+      if (data.image !== undefined) updateData.profileImage = sanitizeAvatar(data.image);
+      if (data.profileImage !== undefined) updateData.profileImage = sanitizeAvatar(data.profileImage);
       if (data.phone !== undefined) updateData.phone = data.phone;
       const user = await prisma.user.update({
         where: { id: data.id },
@@ -80,7 +86,6 @@ function CustomAuthAdapter(prisma: typeof db) {
       return { ...account.user, image: account.user.profileImage ?? null };
     },
     async linkAccount(account: any) {
-      // Sanitize fields to match exact Prisma Account schema
       const sanitized = {
         userId: account.userId,
         type: account.type,
@@ -101,7 +106,10 @@ function CustomAuthAdapter(prisma: typeof db) {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: CustomAuthAdapter(db),
-  session: { strategy: 'jwt' },
+  session: {
+    strategy: 'jwt',
+    maxAge: 14 * 24 * 60 * 60, // 14-day lifetime
+  },
   pages: { signIn: '/login', error: '/login' },
   providers: [
     Google({
@@ -116,7 +124,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: 'Password', type: 'password' },
         intendedRole: { label: 'Intended Role', type: 'text' },
       },
-      async authorize(credentials) {
+      async authorize(credentials: any) {
         if (!credentials?.email || !credentials?.password) return null;
         const emailLower = (credentials.email as string).toLowerCase().trim();
         const user = await db.user.findUnique({ where: { email: emailLower } });
@@ -124,8 +132,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const valid = await bcrypt.compare(credentials.password as string, user.passwordHash);
         if (!valid) return null;
 
-        // Dedicated admin authority
-        const isDedicatedAdmin = emailLower === 'wristloom@gmail.com';
+        const isDedicatedAdmin = isAdminEmail(emailLower);
         let actualRole = user.role;
         if (isDedicatedAdmin && actualRole !== 'ADMIN') {
           await db.user.update({ where: { id: user.id }, data: { role: 'ADMIN' } });
@@ -146,61 +153,69 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           role: actualRole,
           phone: user.phone,
-          image: user.profileImage,
+          image: sanitizeAvatar(user.profileImage),
         };
       },
     }),
   ],
   callbacks: {
-    async jwt({ token, user, trigger, session }) {
+    async jwt({ token, user, trigger, session }: any) {
       if (user) {
         token.id = user.id;
         token.role = (user as any).role ?? 'CUSTOMER';
         token.phone = (user as any).phone ?? null;
-        if (user.image) token.picture = user.image;
+        if (user.image) token.picture = sanitizeAvatar(user.image);
         if (user.name) token.name = user.name;
         if (user.email) token.email = (user.email as string).toLowerCase().trim();
+        token.lastDbCheck = Date.now();
       }
 
       const emailLower = (token.email as string | undefined)?.toLowerCase().trim();
-      if (emailLower === 'wristloom@gmail.com') {
+      if (isAdminEmail(emailLower)) {
         token.role = 'ADMIN';
       }
 
-      if (emailLower) {
+      // Throttle DB refresh to at most once every 60 seconds
+      const now = Date.now();
+      const lastCheck = typeof token.lastDbCheck === 'number' ? token.lastDbCheck : 0;
+      const shouldCheckDb = Boolean(emailLower && (!lastCheck || now - lastCheck > 60000));
+
+      if (shouldCheckDb && emailLower) {
         try {
           const dbUser = await db.user.findUnique({
             where: { email: emailLower },
-            select: { id: true, role: true, phone: true, profileImage: true },
+            select: { id: true, name: true, role: true, phone: true, profileImage: true },
           });
           if (dbUser) {
             token.id = dbUser.id;
-            token.role = emailLower === 'wristloom@gmail.com' ? 'ADMIN' : dbUser.role;
-            if (dbUser.phone) token.phone = dbUser.phone;
-            if (dbUser.profileImage && !token.picture) token.picture = dbUser.profileImage;
+            if (dbUser.name) token.name = dbUser.name;
+            token.role = isAdminEmail(emailLower) ? 'ADMIN' : dbUser.role;
+            token.phone = dbUser.phone ?? null;
+            if (dbUser.profileImage) token.picture = sanitizeAvatar(dbUser.profileImage);
           }
+          token.lastDbCheck = now;
         } catch (e) {
           console.error('[auth] Error fetching user role in jwt callback:', e);
         }
       }
 
       if (!token.role) {
-        token.role = emailLower === 'wristloom@gmail.com' ? 'ADMIN' : 'CUSTOMER';
+        token.role = isAdminEmail(emailLower) ? 'ADMIN' : 'CUSTOMER';
       }
       if (trigger === 'update' && session) {
         const updateData = session.user ?? session;
         if (updateData.name !== undefined) token.name = updateData.name;
         if (updateData.phone !== undefined) token.phone = updateData.phone;
-        if (updateData.image !== undefined) token.picture = updateData.image;
+        if (updateData.image !== undefined) token.picture = sanitizeAvatar(updateData.image);
       }
       return token;
     },
-    async session({ session, token }) {
+    async session({ session, token }: any) {
       if (session.user) {
         session.user.id = (token.id as string) || (token.sub as string);
         if (token.name) session.user.name = token.name as string;
         if (token.email) session.user.email = (token.email as string).toLowerCase().trim();
-        session.user.role = ((token.email as string)?.toLowerCase().trim() === 'wristloom@gmail.com' ? 'ADMIN' : token.role as UserRole) ?? 'CUSTOMER';
+        session.user.role = (isAdminEmail(token.email as string) ? 'ADMIN' : (token.role as UserRole)) ?? 'CUSTOMER';
         session.user.phone = (token.phone as string | null) ?? null;
         if (token.picture) {
           session.user.image = token.picture as string;
@@ -208,7 +223,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return session;
     },
-    async signIn({ account }) {
+    async signIn({ account }: any) {
       if (account?.provider === 'google') return true;
       return true;
     },

@@ -52,11 +52,12 @@ export default async function ServiceTrackingPage({ params }: { params: Promise<
       include: {
         technician: {
           include: {
-            user: { select: { name: true, profileImage: true } },
+            user: { select: { name: true, profileImage: true, phone: true } },
           },
         },
         address: true,
-        customer: { select: { id: true, name: true, email: true } },
+        customer: { select: { id: true, name: true, email: true, phone: true } },
+        serviceHistory: { orderBy: { date: 'asc' } },
       },
     });
   } catch (err) {
@@ -85,6 +86,26 @@ export default async function ServiceTrackingPage({ params }: { params: Promise<
         reference: booking.bookingReference,
         serviceType: booking.serviceType,
         status: booking.status,
+        watchBrand: booking.watchBrand ?? null,
+        watchModel: booking.watchModel ?? null,
+        watchReferenceNumber: booking.watchReferenceNumber ?? null,
+        issueDescription: booking.issueDescription ?? null,
+        scheduledDate: booking.scheduledDate.toISOString(),
+        scheduledTimeStart: booking.scheduledTimeStart,
+        scheduledTimeEnd: booking.scheduledTimeEnd,
+        estimatedPrice: booking.estimatedPrice ?? null,
+        finalPrice: booking.finalPrice ?? null,
+        paymentStatus: booking.paymentStatus,
+        notes: booking.notes ?? null,
+        createdAt: booking.createdAt.toISOString(),
+        serviceHistory: booking.serviceHistory?.map((h) => ({
+          id: h.id,
+          date: h.date.toISOString(),
+          serviceType: h.serviceType,
+          description: h.description,
+          technicianName: h.technicianName,
+          cost: h.cost,
+        })) ?? [],
         address: booking.address
           ? {
               formattedAddress: booking.address.formattedAddress,
@@ -97,6 +118,7 @@ export default async function ServiceTrackingPage({ params }: { params: Promise<
               id: booking.technician.id,
               name: booking.technician.user.name ?? 'Technician',
               profileImage: booking.technician.user.profileImage ?? null,
+              phone: booking.technician.user.phone ?? null,
               rating: booking.technician.rating,
               specializations: booking.technician.specializations,
               currentLatitude: booking.technician.currentLatitude,

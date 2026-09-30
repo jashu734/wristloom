@@ -21,6 +21,7 @@ import {
   Check,
   X,
   Loader2,
+  Truck,
 } from 'lucide-react';
 import { Button } from '@/components/primitives/Button';
 import { Badge, HealthBadge } from '@/components/primitives/Badge';
@@ -38,9 +39,9 @@ const DEMO_USER = {
 };
 
 const RECENT_ACTIVITY = [
-  { id: 'act-1', type: 'service', label: 'Full Service & Overhaul completed', sub: 'Rolex Submariner · Arjun Mehta', date: '2024-11-15', icon: Wrench },
+  { id: 'act-1', type: 'service', label: 'Full Service & Overhaul completed', sub: 'Titan Edge · Arjun Mehta', date: '2024-11-15', icon: Wrench },
   { id: 'act-2', type: 'purchase', label: 'Watch purchased', sub: 'Omega Speedmaster Professional', date: '2024-10-28', icon: Package },
-  { id: 'act-3', type: 'auth', label: 'Authentication certificate issued', sub: 'Audemars Piguet Royal Oak', date: '2024-09-12', icon: Shield },
+  { id: 'act-3', type: 'auth', label: 'Authentication certificate issued', sub: 'Seiko Presage Cocktail Time', date: '2024-09-12', icon: Shield },
   { id: 'act-4', type: 'credit', label: 'Platform credit awarded', sub: 'Trade-in completion bonus · ₹4,500', date: '2024-08-30', icon: CreditCard },
 ];
 
@@ -265,11 +266,11 @@ function VaultTab() {
             href="/watch-vault"
             className="group bg-[#1E1A17] border border-[rgba(176,141,87,0.10)] hover:border-[rgba(176,141,87,0.25)] rounded-[2px] overflow-hidden transition-all duration-300"
           >
-            <div className="aspect-square overflow-hidden">
+            <div className="aspect-square overflow-hidden bg-[#14110F] p-4 flex items-center justify-center">
               <img
                 src={item.photo_urls[0]}
                 alt={item.watch_name}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-[1.04]"
               />
             </div>
             <div className="p-4">
@@ -333,116 +334,236 @@ function OrdersTab() {
   const hasItems = orders.length > 0 || bookings.length > 0;
 
   return (
-    <div className="space-y-8">
-      {/* Product Orders */}
+    <div className="space-y-10">
+      {/* Product Orders / Watch Acquisitions */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.35)]">
-            Watch Acquisitions ({orders.length})
+          <h2 className="font-mono text-xs tracking-widest uppercase text-[#B08D57] font-semibold flex items-center gap-2">
+            <Package className="w-4 h-4" />
+            <span>Watch Acquisitions ({orders.length})</span>
           </h2>
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/shop">Browse Atelier <ChevronRight className="w-3.5 h-3.5" /></Link>
+            <Link href="/shop" className="text-xs font-mono uppercase tracking-wider text-[rgba(237,230,214,0.60)] hover:text-[#B08D57]">
+              Browse Atelier <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
           </Button>
         </div>
 
         {orders.length === 0 ? (
-          <div className="bg-[#1E1A17] border border-[rgba(176,141,87,0.08)] rounded-[2px] p-6 text-center">
+          <div className="bg-[#1E1A17] border border-[rgba(176,141,87,0.08)] rounded-[2px] p-8 text-center">
             <Package className="w-8 h-8 text-[rgba(176,141,87,0.30)] mx-auto mb-2" />
             <p className="text-sm text-[rgba(237,230,214,0.50)]">No timepiece acquisitions recorded yet.</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {orders.map((order) => (
-              <div key={order.id} className="bg-[#1E1A17] border border-[rgba(176,141,87,0.08)] rounded-[2px] p-5">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="neutral">Purchase</Badge>
-                    <span className="font-mono text-[10px] text-[#B08D57] font-semibold">{order.orderReference}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`font-mono text-[10px] uppercase tracking-wider ${statusColor[order.status] ?? 'text-[rgba(237,230,214,0.45)]'}`}>
-                      {order.status}
-                    </span>
-                    <span className="font-mono text-sm text-[#EDE6D6] font-semibold">{formatCurrency(order.totalAmount)}</span>
-                  </div>
-                </div>
+          <div className="space-y-4">
+            {orders.map((order) => {
+              // Parse tracking metadata from order notes if present
+              let tracking: any = null;
+              try {
+                if (order.notes && (order.notes.startsWith('{') || order.notes.includes('"trackingNumber"'))) {
+                  tracking = JSON.parse(order.notes);
+                }
+              } catch {}
 
-                <div className="space-y-2 border-t border-[rgba(176,141,87,0.05)] pt-3">
-                  {order.orderItems?.map((item: any) => (
-                    <div key={item.id} className="flex items-center justify-between text-xs text-[rgba(237,230,214,0.70)]">
-                      <span>{item.brand} — {item.name} (x{item.quantity})</span>
-                      <span className="font-mono">{formatCurrency(item.price * item.quantity)}</span>
+              const trackingCode = tracking?.trackingNumber || `WLTRK${order.orderReference.replace(/[^0-9]/g, '') || '982341'}`;
+              const estDelivery = tracking?.estimatedDelivery || new Date(new Date(order.createdAt).getTime() + 4 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+              const carrier = tracking?.carrier || 'Armored Courier Logistics';
+
+              return (
+                <div key={order.id} className="bg-[#1E1A17] border border-[rgba(176,141,87,0.12)] hover:border-[rgba(176,141,87,0.25)] rounded-[2px] p-5 sm:p-6 transition-colors">
+                  {/* Top Bar */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[rgba(176,141,87,0.08)]">
+                    <div className="flex items-center gap-2.5">
+                      <Badge variant="neutral">Purchase</Badge>
+                      <span className="font-mono text-xs text-[#B08D57] font-semibold">{order.orderReference}</span>
                     </div>
-                  ))}
-                </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`px-2 py-0.5 rounded-[1px] font-mono text-[9px] uppercase tracking-wider ${
+                        order.paymentStatus === 'PAID' || order.paymentStatus === 'FULLY_PAID'
+                          ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-800/40'
+                          : 'bg-amber-950/60 text-amber-300 border border-amber-800/40'
+                      }`}>
+                        {order.paymentStatus}
+                      </span>
+                      <span className={`font-mono text-[10px] uppercase font-semibold tracking-wider ${statusColor[order.status] ?? 'text-[#EDE6D6]'}`}>
+                        {order.status}
+                      </span>
+                      <span className="font-mono text-sm text-[#EDE6D6] font-semibold">
+                        {formatCurrency(order.totalAmount)}
+                      </span>
+                    </div>
+                  </div>
 
-                <div className="flex items-center justify-between mt-3 pt-2 text-[10px] text-[rgba(237,230,214,0.35)] font-mono">
-                  <span>Ordered on {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                  <span>Payment: {order.paymentMethod}</span>
+                  {/* Items List */}
+                  <div className="py-3 space-y-2.5">
+                    {order.orderItems?.map((item: any) => (
+                      <div key={item.id} className="flex items-center justify-between text-xs text-[rgba(237,230,214,0.85)]">
+                        <div className="flex items-center gap-2.5">
+                          {item.imageUrl && (
+                            <div className="w-9 h-9 rounded-[2px] bg-[#14110F] border border-[rgba(176,141,87,0.15)] p-0.5 flex-shrink-0 flex items-center justify-center">
+                              <img src={item.imageUrl} alt={item.name} className="w-full h-full object-contain" />
+                            </div>
+                          )}
+                          <div>
+                            <span className="font-semibold text-[#EDE6D6]">{item.brand}</span> — {item.name}{' '}
+                            <span className="text-[rgba(237,230,214,0.40)] font-mono">(x{item.quantity})</span>
+                          </div>
+                        </div>
+                        <span className="font-mono text-[#B08D57]">{formatCurrency(item.price * item.quantity)}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Shipment Tracking Summary Card */}
+                  <div className="bg-[#141210] border border-[rgba(176,141,87,0.08)] rounded-[2px] p-3 flex flex-wrap items-center justify-between gap-3 text-xs text-[rgba(237,230,214,0.60)]">
+                    <div className="flex items-center gap-2">
+                      <Truck className="w-3.5 h-3.5 text-[#B08D57]" />
+                      <span className="font-mono text-[11px]">
+                        Tracking: <strong className="text-[#EDE6D6] font-semibold">{trackingCode}</strong>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 text-[11px] font-mono">
+                      <span>Carrier: <span className="text-[rgba(237,230,214,0.80)]">{carrier}</span></span>
+                      <span>Est. Delivery: <span className="text-[#B08D57]">{estDelivery}</span></span>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons Row */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-3 border-t border-[rgba(176,141,87,0.08)]">
+                    <span className="text-[10px] text-[rgba(237,230,214,0.45)] font-mono">
+                      Ordered on {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} · Payment: {order.paymentMethod?.toUpperCase()}
+                    </span>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link href={`/orders/${order.orderReference}`}>
+                          View Order
+                        </Link>
+                      </Button>
+                      <Button variant="primary" size="sm" asChild>
+                        <Link href={`/orders/${order.orderReference}/track`} className="flex items-center gap-1.5">
+                          <Truck className="w-3.5 h-3.5" />
+                          <span>Track Order</span>
+                        </Link>
+                      </Button>
+                      <Link
+                        href={`/orders/${order.orderReference}/certificate`}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-[2px] bg-[rgba(176,141,87,0.10)] border border-[rgba(176,141,87,0.20)] text-[#B08D57] hover:bg-[#B08D57] hover:text-[#0E0C0A] transition-colors text-xs font-mono uppercase tracking-wider"
+                      >
+                        <Shield className="w-3 h-3" />
+                        <span>Certificate</span>
+                      </Link>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* Service Bookings */}
+      {/* Service Bookings / Service & Restoration */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-mono text-[10px] tracking-widest uppercase text-[rgba(237,230,214,0.35)]">
-            Service & Restoration Bookings ({bookings.length})
+          <h2 className="font-mono text-xs tracking-widest uppercase text-[#B08D57] font-semibold flex items-center gap-2">
+            <Wrench className="w-4 h-4" />
+            <span>Service & Restoration Bookings ({bookings.length})</span>
           </h2>
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/services/repair">Book Service <ChevronRight className="w-3.5 h-3.5" /></Link>
+            <Link href="/services/repair" className="text-xs font-mono uppercase tracking-wider text-[rgba(237,230,214,0.60)] hover:text-[#B08D57]">
+              Book Service <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
           </Button>
         </div>
 
         {bookings.length === 0 ? (
-          <div className="bg-[#1E1A17] border border-[rgba(176,141,87,0.08)] rounded-[2px] p-6 text-center">
+          <div className="bg-[#1E1A17] border border-[rgba(176,141,87,0.08)] rounded-[2px] p-8 text-center">
             <Wrench className="w-8 h-8 text-[rgba(176,141,87,0.30)] mx-auto mb-2" />
             <p className="text-sm text-[rgba(237,230,214,0.50)]">No watch repair or maintenance bookings yet.</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {bookings.map((booking) => (
-              <div key={booking.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#1E1A17] border border-[rgba(176,141,87,0.08)] rounded-[2px] p-5">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge variant="brass">Service</Badge>
-                    <span className="font-mono text-[9px] text-[rgba(237,230,214,0.40)] uppercase">{booking.bookingReference}</span>
-                    <span className={`font-mono text-[10px] uppercase font-medium ${statusColor[booking.status] ?? 'text-[rgba(237,230,214,0.50)]'}`}>
-                      {booking.status.replace(/_/g, ' ')}
-                    </span>
-                  </div>
-                  <p className="text-sm text-[#EDE6D6] font-medium">{booking.serviceType}</p>
-                  <p className="text-xs text-[rgba(237,230,214,0.50)] mt-0.5">
-                    {booking.watchBrand ? `${booking.watchBrand} ${booking.watchModel || ''}` : 'Timepiece'} · Scheduled for {new Date(booking.scheduledDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ({booking.scheduledTimeStart} - {booking.scheduledTimeEnd})
-                  </p>
-                  {booking.technician?.user && (
-                    <p className="text-xs text-[#B08D57] mt-1">
-                      Assigned Master Horologist: {booking.technician.user.name}
-                    </p>
-                  )}
-                </div>
+          <div className="space-y-4">
+            {bookings.map((booking) => {
+              const bookingCost = booking.finalPrice ?? booking.estimatedPrice ?? 8500;
+              const estCompletion = new Date(new Date(booking.scheduledDate).getTime() + 5 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 
-                <div className="flex items-center gap-3">
-                  {booking.status === 'TECHNICIAN_EN_ROUTE' && (
-                    <Button variant="primary" size="sm" asChild>
-                      <Link href={`/service-tracking?id=${booking.id}`}>
-                        Track Live Radar
-                      </Link>
-                    </Button>
-                  )}
-                  {booking.status !== 'TECHNICIAN_EN_ROUTE' && booking.status !== 'CANCELLED' && (
-                    <Button variant="subtle" size="sm" asChild>
-                      <Link href={`/service-tracking?id=${booking.id}`}>
-                        View Status
-                      </Link>
-                    </Button>
-                  )}
+              return (
+                <div key={booking.id} className="bg-[#1E1A17] border border-[rgba(176,141,87,0.12)] hover:border-[rgba(176,141,87,0.25)] rounded-[2px] p-5 sm:p-6 transition-colors">
+                  {/* Top Bar */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[rgba(176,141,87,0.08)]">
+                    <div className="flex items-center gap-2.5">
+                      <Badge variant="brass">Service</Badge>
+                      <span className="font-mono text-xs text-[#B08D57] font-semibold">{booking.bookingReference}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`px-2 py-0.5 rounded-[1px] font-mono text-[9px] uppercase tracking-wider ${
+                        booking.paymentStatus === 'FULLY_PAID' || booking.paymentStatus === 'PAID'
+                          ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-800/40'
+                          : 'bg-amber-950/60 text-amber-300 border border-amber-800/40'
+                      }`}>
+                        {booking.paymentStatus}
+                      </span>
+                      <span className={`font-mono text-[10px] uppercase font-semibold tracking-wider ${statusColor[booking.status] ?? 'text-[#EDE6D6]'}`}>
+                        {booking.status.replace(/_/g, ' ')}
+                      </span>
+                      <span className="font-mono text-sm text-[#B08D57] font-semibold">
+                        {formatCurrency(bookingCost)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Service & Timepiece Info */}
+                  <div className="py-3 space-y-1.5">
+                    <p className="text-base text-[#EDE6D6] font-display">{booking.serviceType}</p>
+                    <p className="text-xs text-[rgba(237,230,214,0.65)]">
+                      <span className="font-semibold text-[#EDE6D6]">
+                        {booking.watchBrand ? `${booking.watchBrand} ${booking.watchModel || ''}` : 'Timepiece'}
+                      </span>
+                      {booking.watchReferenceNumber && <span className="font-mono text-[11px] text-[rgba(237,230,214,0.40)]"> · Ref: {booking.watchReferenceNumber}</span>}
+                    </p>
+                    {booking.technician?.user && (
+                      <p className="text-xs text-[#B08D57] font-medium pt-1">
+                        Assigned Master Horologist: {booking.technician.user.name}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Schedule & Intake Summary */}
+                  <div className="bg-[#141210] border border-[rgba(176,141,87,0.08)] rounded-[2px] p-3 flex flex-wrap items-center justify-between gap-3 text-xs text-[rgba(237,230,214,0.60)]">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-3.5 h-3.5 text-[#B08D57]" />
+                      <span>
+                        Appointment: <strong className="text-[#EDE6D6]">{new Date(booking.scheduledDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ({booking.scheduledTimeStart} - {booking.scheduledTimeEnd})</strong>
+                      </span>
+                    </div>
+                    <div className="font-mono text-[11px]">
+                      Est. Completion: <span className="text-[#B08D57] font-semibold">{estCompletion}</span>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons Row */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-3 border-t border-[rgba(176,141,87,0.08)]">
+                    <span className="text-[10px] text-[rgba(237,230,214,0.45)] font-mono">
+                      Service Request #{booking.bookingReference}
+                    </span>
+
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link href={`/services/${booking.id}`}>
+                          View Service
+                        </Link>
+                      </Button>
+                      <Button variant="primary" size="sm" asChild>
+                        <Link href={`/service-tracking/${booking.id}`} className="flex items-center gap-1.5">
+                          <Wrench className="w-3.5 h-3.5" />
+                          <span>Track Service</span>
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

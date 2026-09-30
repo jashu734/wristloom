@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { auth } from '@/lib/auth';
+import { formatCurrency } from '@/lib/utils';
 
 export async function GET(req: NextRequest) {
   try {
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest) {
       systemAlerts.push({
         id: `sys_order_${o.id}`,
         title: 'New Watch Order Pending',
-        body: `Acquisition order #${o.orderReference} for ₹${o.totalAmount.toLocaleString()} is pending processing.`,
+        body: `Acquisition order #${o.orderReference} for ${formatCurrency(o.totalAmount)} is pending processing.`,
         type: 'PENDING_ORDER',
         read: false,
         createdAt: o.createdAt,

@@ -125,6 +125,7 @@ model User {
   notifications     Notification[]
   reviewsGiven      Review[]        @relation("ReviewsGiven")
   orders            Order[]         @relation("UserOrders")
+  cart              Cart?
 
   @@map("users")
 }
@@ -151,6 +152,7 @@ model Address {
   user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   bookings RepairBooking[]
 
+  @@index([userId])
   @@map("addresses")
 }
 
@@ -221,6 +223,10 @@ model RepairBooking {
   notifications    Notification[]
   serviceHistory   ServiceHistory[]
 
+  @@index([customerId])
+  @@index([technicianId])
+  @@index([status])
+  @@index([scheduledDate])
   @@map("repair_bookings")
 }
 
@@ -273,6 +279,7 @@ model WatchVaultItem {
   owner          User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   serviceHistory ServiceHistory[]
 
+  @@index([ownerId])
   @@map("watch_vault_items")
 }
 
@@ -293,6 +300,8 @@ model ServiceHistory {
   vaultItem WatchVaultItem? @relation(fields: [vaultItemId], references: [id])
   booking   RepairBooking?  @relation(fields: [bookingId], references: [id])
 
+  @@index([vaultItemId])
+  @@index([bookingId])
   @@map("service_history")
 }
 
@@ -321,6 +330,8 @@ model AuthenticationRequest {
 
   customer User? @relation(fields: [customerId], references: [id])
 
+  @@index([customerId])
+  @@index([status])
   @@map("authentication_requests")
 }
 
@@ -347,6 +358,8 @@ model TradeInRequest {
 
   customer User? @relation(fields: [customerId], references: [id])
 
+  @@index([customerId])
+  @@index([status])
   @@map("trade_in_requests")
 }
 
@@ -377,6 +390,7 @@ model CreditTransaction {
 
   wallet CreditWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
 
+  @@index([walletId])
   @@map("credit_transactions")
 }
 
@@ -398,6 +412,9 @@ model Review {
   technician Technician @relation(fields: [technicianId], references: [id])
   customer   User       @relation("ReviewsGiven", fields: [customerId], references: [id])
 
+  @@index([technicianId])
+  @@index([customerId])
+  @@index([bookingId])
   @@map("reviews")
 }
 
@@ -418,6 +435,7 @@ model Notification {
   booking RepairBooking? @relation(fields: [bookingId], references: [id])
 
   @@index([userId, read])
+  @@index([bookingId])
   @@map("notifications")
 }
 
@@ -436,11 +454,14 @@ model Product {
   id                     String      @id @default(cuid())
   slug                   String      @unique
   name                   String
+  modelName              String?     @map("model_name")
   brand                  String
   referenceNumber        String?     @map("reference_number")
   price                  Float
+  purchaseValue          Float?      @map("purchase_value")
   currency               String      @default("INR")
   images                 String[]
+  imageUrl               String?     @map("image_url")
   description            String      @db.Text
   craftsmanshipNarrative String?     @db.Text @map("craftsmanship_narrative")
   movementType           String?     @map("movement_type")
@@ -456,14 +477,47 @@ model Product {
   year                   Int?
   inStock                Boolean     @default(true) @map("in_stock")
   stockCount             Int         @default(5) @map("stock_count")
+  stock                  Int         @default(5) @map("stock")
   collection             String?
   tags                   String[]
+  isActive               Boolean     @default(true) @map("is_active")
   createdAt              DateTime    @default(now()) @map("created_at")
   updatedAt              DateTime    @updatedAt @map("updated_at")
 
   orderItems             OrderItem[]
+  cartItems              CartItem[]
 
   @@map("products")
+}
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String     @unique @map("user_id")
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id          String   @id @default(cuid())
+  cartId      String   @map("cart_id")
+  productId   String   @map("product_id")
+  quantity    Int      @default(1)
+  strapOption Json?    @map("strap_option")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  cart        Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+  @@index([cartId])
+  @@index([productId])
+  @@map("cart_items")
 }
 
 model Order {
@@ -486,6 +540,10 @@ model Order {
   user           User?         @relation("UserOrders", fields: [userId], references: [id], onDelete: SetNull)
   orderItems     OrderItem[]
 
+  @@index([userId])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([createdAt])
   @@map("orders")
 }
 
@@ -504,5 +562,7 @@ model OrderItem {
   order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product        Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
+  @@index([orderId])
+  @@index([productId])
   @@map("order_items")
 }

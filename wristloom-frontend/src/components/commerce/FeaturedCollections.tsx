@@ -40,18 +40,18 @@ export function FeaturedCollections() {
           {/* Hero Product */}
           <Link
             href={`/products/${featured.slug}`}
-            className="group relative bg-[#1E1A17] overflow-hidden rounded-[2px] border border-[rgba(176,141,87,0.10)] hover:border-[rgba(176,141,87,0.25)] transition-all duration-300"
+            className="group relative bg-[#1E1A17] overflow-hidden rounded-[2px] border border-[rgba(176,141,87,0.15)] hover:border-[#B08D57] transition-all duration-300 flex flex-col justify-between"
             aria-label={`${featured.brand} ${featured.name}`}
           >
-            <div className="aspect-[4/5] overflow-hidden">
+            <div className="aspect-[4/3] sm:aspect-square overflow-hidden bg-[#14110F] flex items-center justify-center p-6">
               <img
                 src={featured.images[0]}
                 alt={`${featured.brand} ${featured.name}`}
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+                className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-[1.04]"
                 loading="eager"
               />
             </div>
-            <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[rgba(20,17,15,0.95)] via-[rgba(20,17,15,0.60)] to-transparent">
+            <div className="p-6 bg-[#1E1A17] border-t border-[rgba(176,141,87,0.10)]">
               <div className="flex items-center gap-2 mb-2">
                 <Badge variant={featured.condition === 'New' ? 'brass' : 'certified'}>
                   {featured.condition}
@@ -64,24 +64,24 @@ export function FeaturedCollections() {
                 {featured.brand}
               </p>
               <h3 className="font-display text-xl text-[#EDE6D6] mb-2">{featured.name}</h3>
-              <p className="font-mono text-sm text-[#B08D57]">{formatCurrency(featured.price)}</p>
+              <p className="font-mono text-base text-[#B08D57] font-semibold">{formatCurrency(featured.price)}</p>
             </div>
           </Link>
 
           {/* 3 Supporting Products */}
-          <div className="flex flex-col gap-4 lg:gap-6">
+          <div className="flex flex-col gap-4 lg:gap-6 justify-between">
             {rest.map((product) => (
               <Link
                 key={product.id}
                 href={`/products/${product.slug}`}
-                className="group flex gap-4 bg-[#1E1A17] border border-[rgba(176,141,87,0.10)] hover:border-[rgba(176,141,87,0.25)] rounded-[2px] overflow-hidden transition-all duration-300"
+                className="group flex gap-4 bg-[#1E1A17] border border-[rgba(176,141,87,0.15)] hover:border-[#B08D57] rounded-[2px] overflow-hidden transition-all duration-300"
                 aria-label={`${product.brand} ${product.name}`}
               >
-                <div className="w-28 sm:w-36 flex-shrink-0 overflow-hidden">
+                <div className="w-28 sm:w-36 flex-shrink-0 bg-[#14110F] p-2 flex items-center justify-center border-r border-[rgba(176,141,87,0.10)]">
                   <img
                     src={product.images[0]}
                     alt={`${product.brand} ${product.name}`}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+                    className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-[1.05]"
                     loading="lazy"
                   />
                 </div>

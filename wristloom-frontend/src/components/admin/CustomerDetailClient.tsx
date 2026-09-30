@@ -15,6 +15,7 @@ import {
   Calendar,
   ArrowUpRight,
 } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
 
 interface CustomerDetailClientProps {
   customer: any;
@@ -55,7 +56,7 @@ export function CustomerDetailClient({ customer }: CustomerDetailClientProps) {
             <span className="font-mono text-[9px] uppercase tracking-wider text-[rgba(237,230,214,0.40)] block">
               Lifetime Spend
             </span>
-            <span className="font-display text-base text-[#B08D57]">₹{totalSpent.toLocaleString()}</span>
+            <span className="font-display text-base text-[#B08D57]">{formatCurrency(totalSpent)}</span>
           </div>
         </div>
       </div>
@@ -89,7 +90,7 @@ export function CustomerDetailClient({ customer }: CustomerDetailClientProps) {
           <div>
             <span className="font-mono text-[9px] uppercase tracking-widest text-[rgba(237,230,214,0.40)] block">Wallet Credit</span>
             <p className="text-xs text-[#B08D57] font-mono font-semibold">
-              ₹{(customer.creditWallet?.balance ?? 0).toLocaleString()}
+              {formatCurrency(customer.creditWallet?.balance ?? 0)}
             </p>
           </div>
         </div>
@@ -147,7 +148,7 @@ export function CustomerDetailClient({ customer }: CustomerDetailClientProps) {
                       </p>
                     </div>
                     <div className="flex items-center gap-4">
-                      <span className="font-display text-sm text-[#B08D57]">₹{o.totalAmount?.toLocaleString()}</span>
+                      <span className="font-display text-sm text-[#B08D57]">{formatCurrency(o.totalAmount || 0)}</span>
                       <Link
                         href={`/admin/orders/${o.id}`}
                         className="px-2.5 py-1 bg-[#14110F] border border-[rgba(176,141,87,0.20)] hover:border-[#B08D57] text-[10px] font-mono uppercase text-[#EDE6D6] rounded-[2px]"

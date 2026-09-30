@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { db } from '@/lib/db';
 import { auth } from '@/lib/auth';
 import { AdminNotificationsClient } from '@/components/admin/AdminNotificationsClient';
+import { formatCurrency } from '@/lib/utils';
 
 export const metadata: Metadata = {
   title: 'Administrative Notifications',
@@ -65,7 +66,7 @@ export default async function AdminNotificationsPage() {
     systemAlerts.push({
       id: `sys_order_${o.id}`,
       title: 'New Timepiece Order Pending',
-      body: `Acquisition order #${o.orderReference} for ₹${o.totalAmount.toLocaleString()} is pending fulfillment.`,
+      body: `Acquisition order #${o.orderReference} for ${formatCurrency(o.totalAmount)} is pending fulfillment.`,
       type: 'PENDING_ORDER',
       read: false,
       createdAt: o.createdAt.toISOString(),

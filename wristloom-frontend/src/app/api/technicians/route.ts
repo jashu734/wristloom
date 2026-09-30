@@ -6,17 +6,36 @@ import { db } from '@/lib/db';
 
 export async function GET() {
   try {
+    const session = await auth();
+    const isAdmin = session?.user?.role === 'ADMIN';
+
     const technicians = await db.technician.findMany({
-      include: {
+      select: {
+        id: true,
+        userId: true,
+        bio: true,
+        yearsExperience: true,
+        specializations: true,
+        certifications: true,
+        brandsServiced: true,
+        rating: true,
+        completedServices: true,
+        serviceRadiusKm: true,
+        isVerified: true,
+        isAvailable: true,
+        currentLatitude: true,
+        currentLongitude: true,
+        createdAt: true,
         user: {
           select: {
             name: true,
-            email: true,
-            phone: true,
             profileImage: true,
+            email: isAdmin,
+            phone: isAdmin,
           },
         },
       },
+      orderBy: { rating: 'desc' },
     });
 
     if (technicians.length > 0) {
@@ -37,7 +56,7 @@ export async function GET() {
         currentLongitude: 77.5946,
         user: {
           name: 'Marcus Vance',
-          phone: '+91 98765 43210',
+          phone: isAdmin ? '+91 98765 43210' : undefined,
           profileImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
         },
       },
@@ -53,7 +72,7 @@ export async function GET() {
         currentLongitude: 77.6000,
         user: {
           name: 'Elena Rostova',
-          phone: '+91 98765 43211',
+          phone: isAdmin ? '+91 98765 43211' : undefined,
           profileImage: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80',
         },
       },
@@ -101,7 +120,7 @@ export async function POST(req: Request) {
     const user = await db.user.create({
       data: {
         name: parsed.name,
-        email: parsed.email,
+        email: parsed.email.toLowerCase().trim(),
         phone: parsed.phone,
         passwordHash,
         role: 'TECHNICIAN',
@@ -121,7 +140,15 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({ technician: user.technician, user }, { status: 201 });
+    const safeUser = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+    };
+
+    return NextResponse.json({ technician: user.technician, user: safeUser }, { status: 201 });
   } catch (err: any) {
     if (err.name === 'ZodError') {
       return NextResponse.json({ error: err.errors[0]?.message ?? 'Invalid payload' }, { status: 422 });

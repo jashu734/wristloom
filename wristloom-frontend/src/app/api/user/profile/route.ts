@@ -5,9 +5,14 @@ import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 
 const profileSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters').optional(),
-  phone: z.string().optional().nullable(),
-  profileImage: z.string().optional().nullable(),
+  name: z.string().trim().min(2, 'Name must be at least 2 characters').max(100, 'Name too long').optional(),
+  phone: z.string().trim().max(32, 'Phone number too long').optional().nullable(),
+  profileImage: z
+    .string()
+    .max(2048, 'Profile image URL must be under 2048 characters')
+    .refine((val: string) => !val.startsWith('data:'), 'Profile images must be uploaded image URLs, not inline data URLs')
+    .optional()
+    .nullable(),
 });
 
 const passwordSchema = z.object({
@@ -84,7 +89,7 @@ export async function PATCH(request: Request) {
       user: updatedUser,
       message: 'Profile updated successfully',
     });
-  } catch (err: unknown) {
+  } catch (err: any) {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: err.errors[0]?.message ?? 'Invalid input' }, { status: 400 });
     }
@@ -131,7 +136,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ success: true, message: 'Password changed successfully' });
-  } catch (err: unknown) {
+  } catch (err: any) {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: err.errors[0]?.message ?? 'Invalid input' }, { status: 400 });
     }

@@ -62,7 +62,7 @@ export function CommunityClient() {
         : ['https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=800&q=80'],
       watch_brands: newPost.watch_brands
         ? newPost.watch_brands.split(',').map((s) => s.trim())
-        : ['Rolex'],
+        : ['Seiko'],
       featured: false,
     };
 
@@ -265,7 +265,7 @@ export function CommunityClient() {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Rolex, Omega, Patek Philippe"
+                  placeholder="e.g. Seiko, Titan, Omega"
                   value={newPost.watch_brands}
                   onChange={(e) => setNewPost({ ...newPost, watch_brands: e.target.value })}
                   className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.25)] rounded px-3 py-2 text-sm text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
