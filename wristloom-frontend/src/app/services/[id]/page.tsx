@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { CustomerServiceDetailClient } from '@/components/services/CustomerServiceDetailClient';
+import { isGuestEmail } from '@/lib/guest';
 
 export const metadata: Metadata = {
   title: 'Service Dossier | Wristloom Atelier',
@@ -43,8 +44,8 @@ export default async function ServiceDetailPage({
 
   // Verify ownership if authenticated or guest
   if (booking.customerId) {
+    const isGuest = isGuestEmail(booking.customer.email);
     if (!session?.user) {
-      const isGuest = booking.customer.email.includes('guest@wristloom.luxury');
       if (!isGuest) {
         redirect(`/login?callbackUrl=/services/${id}`);
       }
@@ -52,7 +53,6 @@ export default async function ServiceDetailPage({
       const isOwner = booking.customerId === session.user.id;
       const isAdmin = session.user.role === 'ADMIN';
       const isTech = booking.technician?.userId === session.user.id;
-      const isGuest = booking.customer.email.includes('guest@wristloom.luxury');
       if (!isOwner && !isAdmin && !isTech && !isGuest) {
         redirect('/account');
       }

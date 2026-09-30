@@ -22,11 +22,6 @@ export async function POST(req: NextRequest) {
   try {
     const session = await auth();
 
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized: Authentication required to add to cart' }, { status: 401 });
-    }
-
-    const userId = session.user.id;
     const body = await req.json();
     const parsed = addItemSchema.parse(body);
 
@@ -44,6 +39,31 @@ export async function POST(req: NextRequest) {
     if (availableStock <= 0 || !product.inStock) {
       return NextResponse.json({ error: `"${product.name}" is currently out of stock.` }, { status: 400 });
     }
+
+    // If guest, return stock-validated confirmation for local Zustand store
+    if (!session?.user?.id) {
+      return NextResponse.json({
+        success: true,
+        message: 'Product added to guest cart',
+        guest: true,
+        item: {
+          id: `guest-${parsed.productId}`,
+          productId: product.id,
+          quantity: parsed.quantity,
+          strapOption: parsed.strapOption,
+          product: {
+            id: product.id,
+            name: product.modelName || product.name,
+            brand: product.brand,
+            referenceNumber: product.referenceNumber,
+            purchaseValue: product.purchaseValue ?? product.price,
+            imageUrl: product.imageUrl || product.images?.[0] || '/watches/placeholder-watch.svg',
+          },
+        },
+      });
+    }
+
+    const userId = session.user.id;
 
     // 3. Find or create the customer's private cart
     let cart = await db.cart.findUnique({

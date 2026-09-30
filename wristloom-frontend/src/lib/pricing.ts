@@ -79,13 +79,45 @@ export const BOOKABLE_SERVICES: BookableService[] = [
   },
 ];
 
+const SERVICE_ALIASES: Record<string, string> = {
+  regular_service: 'movement-service',
+  'regular-service': 'movement-service',
+  'regular service': 'movement-service',
+  repair: 'movement-service',
+  overhaul: 'movement-service',
+  battery: 'battery-replacement',
+  'battery replacement': 'battery-replacement',
+  strap: 'strap-repair',
+  'strap repair': 'strap-repair',
+  cleaning: 'watch-cleaning',
+  spa: 'watch-cleaning',
+  water: 'water-resistance',
+  'water-resistance': 'water-resistance',
+  glass: 'glass-replacement',
+  crystal: 'glass-replacement',
+  restoration: 'full-restoration',
+};
+
 export function findServiceByNameOrId(nameOrId: string): BookableService | undefined {
+  if (!nameOrId) return undefined;
   const normalized = nameOrId.trim().toLowerCase();
-  return BOOKABLE_SERVICES.find(
-    (s) =>
-      s.id.toLowerCase() === normalized ||
-      s.name.toLowerCase() === normalized ||
-      s.slug.toLowerCase() === normalized
+  const resolvedId = SERVICE_ALIASES[normalized] || normalized;
+
+  return (
+    BOOKABLE_SERVICES.find(
+      (s) =>
+        s.id.toLowerCase() === resolvedId ||
+        s.name.toLowerCase() === resolvedId ||
+        s.slug.toLowerCase() === resolvedId ||
+        s.id.toLowerCase() === normalized ||
+        s.name.toLowerCase() === normalized ||
+        s.slug.toLowerCase() === normalized
+    ) ||
+    BOOKABLE_SERVICES.find(
+      (s) =>
+        s.name.toLowerCase().includes(normalized) ||
+        normalized.includes(s.id.toLowerCase())
+    )
   );
 }
 

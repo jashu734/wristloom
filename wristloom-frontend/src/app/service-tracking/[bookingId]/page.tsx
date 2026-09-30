@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { redirect, notFound } from 'next/navigation';
 import { db } from '@/lib/db';
 import { LiveTrackingClient } from '@/components/tracking/LiveTrackingClient';
+import { isGuestEmail } from '@/lib/guest';
 
 export const metadata: Metadata = {
   title: 'Track Your Service',
@@ -73,7 +74,7 @@ export default async function ServiceTrackingPage({ params }: { params: Promise<
     const isOwner = booking.customerId === session.user.id;
     const isAdmin = session.user.role === 'ADMIN';
     const isAssignedTech = booking.technician?.userId === session.user.id;
-    const isGuestBooking = booking.customer.email.includes('guest@wristloom.luxury');
+    const isGuestBooking = isGuestEmail(booking.customer.email);
     if (!isOwner && !isAdmin && !isAssignedTech && !isGuestBooking) {
       redirect('/account');
     }

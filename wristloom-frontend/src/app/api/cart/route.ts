@@ -13,7 +13,17 @@ export async function GET(req: NextRequest) {
     const session = await auth();
 
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized: Authentication required to view cart' }, { status: 401 });
+      return NextResponse.json({
+        cart: {
+          id: 'guest',
+          userId: null,
+          items: [],
+          totalItems: 0,
+          subtotal: 0,
+          total: 0,
+          isGuest: true,
+        },
+      });
     }
 
     const userId = session.user.id;

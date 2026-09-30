@@ -42,17 +42,18 @@ export async function POST(req: NextRequest) {
     const session = await auth();
     const body = await req.json();
 
-    const {
-      watch_brand,
-      watch_model,
-      reference_number,
-      condition = 'Excellent',
-      box_and_papers = 'Full Set (Box & Papers)',
-      desired_credit_use,
-      contact_name,
-      contact_email,
-      contact_phone,
-    } = body;
+    const watch_brand = body.watch_brand || body.watchBrand;
+    const watch_model = body.watch_model || body.watchModel;
+    const reference_number = body.reference_number || body.referenceNumber || '';
+    const condition = body.condition || 'Excellent';
+    const box_and_papers =
+      body.box_and_papers ||
+      body.boxAndPapers ||
+      (body.originalBoxAndPapers ? 'Full Set (Box & Papers)' : 'Watch Only');
+    const desired_credit_use = body.desired_credit_use || body.desiredCreditUse || 'Purchase a new timepiece';
+    const contact_name = body.contact_name || body.contactName || body.ownerName || session?.user?.name || '';
+    const contact_email = body.contact_email || body.contactEmail || body.ownerEmail || session?.user?.email || '';
+    const contact_phone = body.contact_phone || body.contactPhone || body.ownerPhone || '';
 
     if (!watch_brand || !watch_model || !contact_name || !contact_email) {
       return NextResponse.json({ error: 'Missing required watch or contact details' }, { status: 400 });

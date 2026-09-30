@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { auth } from '@/lib/auth';
+import { generateGuestEmail } from '@/lib/guest';
 
 const addressSchema = z.object({
   fullName: z.string(),
@@ -74,20 +75,17 @@ export async function POST(req: NextRequest) {
 
     let userId = session?.user?.id;
 
-    // If guest, find or create an anonymous/guest customer profile
+    // If guest, create a unique guest customer profile
     if (!userId) {
-      const guestEmail = 'guest@wristloom.luxury';
-      let guestUser = await db.user.findUnique({ where: { email: guestEmail } });
-      if (!guestUser) {
-        guestUser = await db.user.create({
-          data: {
-            name: data.fullName || 'Guest Customer',
-            email: guestEmail,
-            role: 'CUSTOMER',
-            phone: data.phone,
-          },
-        });
-      }
+      const guestEmail = generateGuestEmail();
+      const guestUser = await db.user.create({
+        data: {
+          name: data.fullName || 'Guest Customer',
+          email: guestEmail,
+          role: 'CUSTOMER',
+          phone: data.phone,
+        },
+      });
       userId = guestUser.id;
     }
 

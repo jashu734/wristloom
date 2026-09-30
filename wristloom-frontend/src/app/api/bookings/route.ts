@@ -11,7 +11,7 @@ import { bookingLimiter } from '@/lib/rate-limit';
 import { getClientIp } from '@/lib/http';
 import { calculateServicePrice } from '@/lib/pricing';
 import { validateBookingSlot, findLeastLoadedTechnician } from '@/lib/booking-slots';
-import { generateBookingReference } from '@/lib/guest';
+import { generateBookingReference, generateGuestEmail } from '@/lib/guest';
 import { maskAddress, maskEmail, maskPhone } from '@/lib/privacy';
 
 const bookingSchema = z.object({
@@ -118,20 +118,29 @@ export async function POST(req: NextRequest) {
 
     let customerId = session?.user?.id;
 
-    // 3. If guest, ensure guest profile
+    // 3. If guest, ensure an isolated unique guest profile
     if (!customerId) {
-      const guestEmail = 'guest@wristloom.luxury';
-      let guestUser = await db.user.findUnique({ where: { email: guestEmail } });
-      if (!guestUser) {
-        guestUser = await db.user.create({
+      if (data.addressId) {
+        const address = await db.address.findUnique({
+          where: { id: data.addressId },
+          select: { userId: true },
+        });
+        if (address?.userId) {
+          customerId = address.userId;
+        }
+      }
+
+      if (!customerId) {
+        const guestEmail = generateGuestEmail();
+        const guestUser = await db.user.create({
           data: {
             name: 'Guest Customer',
             email: guestEmail,
             role: 'CUSTOMER',
           },
         });
+        customerId = guestUser.id;
       }
-      customerId = guestUser.id;
     }
 
     // 4. Validate Address Ownership if addressId provided
