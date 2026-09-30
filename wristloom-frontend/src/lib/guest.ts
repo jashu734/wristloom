@@ -1,6 +1,6 @@
 // ============================================================
 // Wristloom — Guest & Reference Generator Helper
-// Generates collision-resistant, cryptographically strong references
+// Generates collision-resistant, secure random references
 // ============================================================
 
 import crypto from 'crypto';

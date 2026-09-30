@@ -1,6 +1,6 @@
 // ============================================================
 // Wristloom — Payment Verification API Route (Next.js)
-// Enforces cryptographic gateway signature verification & idempotent stock reservation
+// Enforces secure gateway signature verification & idempotent stock reservation
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -76,11 +76,11 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Cryptographic signature check if gateway credentials provided
+      // Secure HMAC signature check if gateway credentials provided
       if (razorpay_order_id && razorpay_payment_id && razorpay_signature) {
         const isValid = verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature);
         if (!isValid) {
-          return NextResponse.json({ error: 'Invalid cryptographic payment signature from gateway' }, { status: 400 });
+          return NextResponse.json({ error: 'Invalid payment signature from gateway' }, { status: 400 });
         }
       }
 
@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, booking });
       }
 
-      // Cryptographic signature check if gateway credentials provided
+      // Secure HMAC signature check if gateway credentials provided
       if (razorpay_order_id && razorpay_payment_id && razorpay_signature) {
         const isValid = verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature);
         if (!isValid) {

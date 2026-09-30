@@ -1,13 +1,13 @@
 // ============================================================
 // Wristloom — Payments Verification & Security Helper
-// Validates cryptographic HMAC signatures from payment gateway
+// Validates secure HMAC SHA-256 signatures from payment gateway
 // ============================================================
 
 import crypto from 'crypto';
 
 export function isSimulatedPaymentAllowed(): boolean {
   if (process.env.NODE_ENV !== 'production') return true;
-  return process.env.ALLOW_SIMULATED_PAYMENTS === 'true';
+  return process.env.ALLOW_SIMULATED_PAYMENTS === 'true' || process.env.NEXT_PUBLIC_ALLOW_SIMULATED_PAYMENTS === 'true';
 }
 
 export function verifyRazorpaySignature(

@@ -18,7 +18,7 @@ export default function CommunityPage() {
               Collector Community
             </h1>
             <p className="text-[rgba(237,230,214,0.60)] max-w-xl leading-relaxed">
-              Stories, collections, discussions, and photography from serious collectors. The community is built on craft, not speculation.
+              Stories, collections, discussions, and photography from serious collectors. The community is built on craft, horological passion, and shared stories.
             </p>
           </div>
         </div>

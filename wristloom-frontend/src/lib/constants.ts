@@ -29,7 +29,7 @@ export const FOOTER_NAV = {
     { label: 'Care Guides', href: '/care-guides' },
     { label: 'Watch Care', href: '/watch-care' },
     { label: 'Restoration Gallery', href: '/restoration-gallery' },
-    { label: 'Investment Insights', href: '/investment-insights' },
+    { label: 'Horological Journal', href: '/investment-insights' },
   ],
   HOUSE: [
     { label: 'Technicians', href: '/technicians' },

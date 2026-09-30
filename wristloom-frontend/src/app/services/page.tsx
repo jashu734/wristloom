@@ -47,7 +47,7 @@ export default function ServicesPage() {
               <span className="font-mono text-[10px] tracking-widest uppercase text-[#B08D57] block mb-2">Our Standard</span>
               <h2 className="font-display text-2xl md:text-3xl text-[#EDE6D6] mb-3">The Wristloom Atelier Pledge</h2>
               <p className="text-sm text-[rgba(237,230,214,0.60)] leading-relaxed">
-                Every service conducted through our atelier or white-glove doorstep network adheres to strict Swiss horological standards, backed by comprehensive Lloyd&apos;s transit insurance and cryptographic documentation.
+                Every service conducted through our atelier or white-glove doorstep network adheres to strict Swiss horological standards, backed by comprehensive Lloyd&apos;s transit insurance and certified archival documentation.
               </p>
             </div>
 

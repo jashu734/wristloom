@@ -958,29 +958,29 @@ export const MOCK_CARE_GUIDES: CareGuide[] = [
   },
 ];
 
-// ─── Investment Insights ──────────────────────────────────────
+// ─── Horological Journal & Heritage Chronicles ───────────────
 
 export const MOCK_INVESTMENT_INSIGHTS: InvestmentInsight[] = [
   {
     id: 'ins-001',
-    slug: 'rolex-secondary-market-2024',
-    title: 'The Rolex secondary market in 2024 — a data-driven perspective',
-    excerpt: 'After the speculative peaks of 2021 and 2022, the secondary market has entered a period of normalisation. What does this mean for collectors?',
+    slug: 'swiss-mechanical-horology-legacy',
+    title: 'The Enduring Legacy of Swiss Mechanical Horology',
+    excerpt: 'Exploring how heritage ateliers maintain precision manufacturing, mechanical longevity, and timeless architectural design across centuries.',
     body: '',
-    brand_focus: 'Rolex',
-    read_time_minutes: 12,
+    brand_focus: 'Rolex & Geneva Ateliers',
+    read_time_minutes: 10,
     published_at: '2024-11-01T00:00:00Z',
-    disclaimer: 'This article is for educational purposes only. Wristloom does not provide investment advice. Watch values can decrease as well as increase.',
+    disclaimer: 'Curated editorial archive from the Wristloom Horological Atelier celebrating classic craftsmanship.',
   },
   {
     id: 'ins-002',
-    slug: 'grand-seiko-appreciation',
-    title: 'Grand Seiko\'s quiet ascent — understanding the value trajectory',
-    excerpt: 'Once regarded as a curiosity outside Japan, Grand Seiko has become one of the most discussed names in serious collecting circles.',
+    slug: 'grand-seiko-spring-drive-craft',
+    title: 'Grand Seiko & The Mastery of Spring Drive Regulation',
+    excerpt: 'An in-depth look at how master artisans bridged quartz regulation and mechanical drive in the Shinshu Watch Studio.',
     body: '',
     brand_focus: 'Grand Seiko',
-    read_time_minutes: 9,
+    read_time_minutes: 8,
     published_at: '2024-10-15T00:00:00Z',
-    disclaimer: 'This article is for educational purposes only. Past appreciation does not predict future performance.',
+    disclaimer: 'Curated editorial archive from the Wristloom Horological Atelier celebrating classic craftsmanship.',
   },
 ];

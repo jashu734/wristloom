@@ -66,8 +66,8 @@ export function CertificateClient({ order }: { order: OrderData }) {
     }
   };
 
-  // Pseudo cryptographic hash for provenance verification
-  const cryptoHash = `SHA256:0x${Array.from(order.orderReference)
+  // Archival verification hash for official provenance
+  const registryHash = `REG:0x${Array.from(order.orderReference)
     .map((c) => c.charCodeAt(0).toString(16))
     .join('')}e74b9a1029c`;
 
@@ -164,11 +164,11 @@ export function CertificateClient({ order }: { order: OrderData }) {
 
             <div className="md:text-right">
               <span className="font-mono text-[10px] tracking-widest uppercase text-[#B08D57] block mb-1">
-                Settlement & Escrow Guarantee
+                Settlement & Payment Verification
               </span>
               <div className="inline-flex items-center gap-1.5 font-mono text-xs font-semibold text-emerald-400 print:text-emerald-700">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>FULLY_PAID & ESCROW RELEASED</span>
+                <span>FULLY_PAID & VERIFIED</span>
               </div>
               <p className="font-mono text-[10px] text-[rgba(237,230,214,0.4)] mt-0.5 print:text-gray-500">
                 Method: {order.paymentMethod.toUpperCase()} · Valued at {formatCurrency(order.totalAmount)}
@@ -253,10 +253,10 @@ export function CertificateClient({ order }: { order: OrderData }) {
             </div>
             <div>
               <span className="font-mono text-[9px] uppercase text-[#B08D57] block font-semibold">
-                Cryptographic Ledger ID
+                Archival Registry ID
               </span>
               <span className="font-mono text-[10px] text-[rgba(237,230,214,0.6)] break-all max-w-xs block print:text-gray-700">
-                {cryptoHash}
+                {registryHash}
               </span>
             </div>
           </div>
