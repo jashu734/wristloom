@@ -17,27 +17,34 @@ const createOrderSchema = z.object({
       z.object({
         productId: z.string().min(1, 'Product ID required'),
         quantity: z.number().int().min(1).max(10).default(1),
+        name: z.string().optional(),
+        brand: z.string().optional(),
+        referenceNumber: z.string().nullable().optional(),
+        price: z.number().optional(),
+        imageUrl: z.string().nullable().optional(),
         strapOption: z
           .object({
-            id: z.string(),
-            material: z.string(),
-            price_addon: z.number().default(0),
+            id: z.string().optional(),
+            material: z.string().optional(),
+            price_addon: z.number().default(0).optional(),
           })
+          .nullable()
           .optional(),
       })
     )
     .min(1, 'Order must contain at least one item'),
+  totalAmount: z.number().optional(),
   shippingName: z.string().trim().min(2, 'Name is required').max(100),
   shippingEmail: z.string().trim().email('Valid email is required').max(255),
   shippingPhone: z.string().trim().min(6, 'Phone is required').max(32),
   shippingAddress: z.object({
     addressLine: z.string().min(3),
     city: z.string().min(2),
-    postalCode: z.string().optional(),
+    postalCode: z.string().nullable().optional(),
     country: z.string().default('India'),
   }),
   paymentMethod: z.string().default('concierge'),
-  notes: z.string().max(1000).optional(),
+  notes: z.string().max(1000).nullable().optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -196,7 +203,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ order }, { status: 201 });
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      return NextResponse.json({ error: error.errors[0]?.message ?? 'Invalid order payload' }, { status: 422 });
+      console.error('[Orders Validation ZodError]:', JSON.stringify(error.errors, null, 2));
+      const firstIssue = error.errors[0];
+      const fieldPath = firstIssue?.path?.length ? firstIssue.path.join('.') : 'payload';
+      return NextResponse.json(
+        { error: `Invalid order information: ${fieldPath} (${firstIssue?.message || 'invalid format'})` },
+        { status: 422 }
+      );
     }
     console.error('[Orders POST Error]', error);
     return NextResponse.json({ error: error.message ?? 'Failed to create order' }, { status: 500 });

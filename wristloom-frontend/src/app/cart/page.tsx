@@ -136,7 +136,13 @@ export default function CartPage() {
           price: item.price + (item.strapOption?.price_addon ?? 0),
           quantity: item.quantity,
           imageUrl: item.image,
-          strapOption: item.strapOption,
+          strapOption: item.strapOption
+            ? {
+                id: item.strapOption.id,
+                material: item.strapOption.material,
+                price_addon: item.strapOption.price_addon || 0,
+              }
+            : undefined,
         })),
         totalAmount: subtotal,
         shippingName: formData.fullName || session?.user?.name || 'Valued Collector',
