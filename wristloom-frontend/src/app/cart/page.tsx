@@ -24,6 +24,7 @@ import {
 import { formatCurrency } from '@/lib/utils';
 import { Button } from '@/components/primitives/Button';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 import { useCartStore, CartItem } from '@/store/cartStore';
 
 declare global {
@@ -72,6 +73,8 @@ export default function CartPage() {
     transactionId?: string;
   } | null>(null);
 
+  const { data: session } = useSession();
+
   const [formData, setFormData] = React.useState({
     fullName: '',
     email: '',
@@ -87,6 +90,18 @@ export default function CartPage() {
     setMounted(true);
     syncWithServer();
   }, [syncWithServer]);
+
+  // Auto-prefill customer details from authenticated session
+  React.useEffect(() => {
+    if (session?.user) {
+      setFormData((prev) => ({
+        ...prev,
+        fullName: prev.fullName || session.user.name || '',
+        email: prev.email || session.user.email || '',
+        phone: prev.phone || (session.user as any).phone || '',
+      }));
+    }
+  }, [session]);
 
   // Quick-add featured watch if cart is empty
   const handleAddFeaturedProduct = () => {
@@ -114,7 +129,7 @@ export default function CartPage() {
       // 1. Create order in PostgreSQL database
       const orderPayload = {
         items: items.map((item) => ({
-          productId: item.id.startsWith('prod-') ? undefined : item.id,
+          productId: item.id.startsWith('prod-') ? (item.slug || item.reference_number || item.id) : item.id,
           name: item.name,
           brand: item.brand,
           referenceNumber: item.reference_number || undefined,
@@ -124,9 +139,9 @@ export default function CartPage() {
           strapOption: item.strapOption,
         })),
         totalAmount: subtotal,
-        shippingName: formData.fullName || 'Valued Collector',
-        shippingEmail: formData.email || 'collector@wristloom.com',
-        shippingPhone: formData.phone || '+91 98765 43210',
+        shippingName: formData.fullName || session?.user?.name || 'Valued Collector',
+        shippingEmail: formData.email || session?.user?.email || 'collector@wristloom.com',
+        shippingPhone: formData.phone || (session?.user as any)?.phone || '+91 98765 43210',
         shippingAddress: {
           addressLine: formData.addressLine || 'Private Atelier Residence',
           city: formData.city || 'Mumbai',
@@ -158,9 +173,9 @@ export default function CartPage() {
           items: [...items],
           subtotal,
           shipping: {
-            name: formData.fullName || 'Valued Collector',
-            email: formData.email || 'collector@wristloom.com',
-            phone: formData.phone || '+91 98765 43210',
+            name: formData.fullName || session?.user?.name || 'Valued Collector',
+            email: formData.email || session?.user?.email || 'collector@wristloom.com',
+            phone: formData.phone || (session?.user as any)?.phone || '+91 98765 43210',
             address: formData.addressLine || 'Private Atelier Residence',
             city: formData.city || 'Mumbai',
           },
@@ -187,11 +202,10 @@ export default function CartPage() {
         body: JSON.stringify({ orderId: createdOrder.id, amount: subtotal }),
       });
 
-      if (!orderRes.ok) {
-        throw new Error('Failed to generate payment gateway order.');
-      }
-
       const rzpOrder = await orderRes.json();
+      if (!orderRes.ok) {
+        throw new Error(rzpOrder.error || 'Failed to generate payment gateway order.');
+      }
 
       // If Razorpay SDK is available, trigger the official checkout modal
       if (typeof window !== 'undefined' && window.Razorpay) {
@@ -203,9 +217,9 @@ export default function CartPage() {
           description: `Order #${createdOrder.orderReference} — Luxury Timepiece Acquisition`,
           order_id: rzpOrder.orderId,
           prefill: {
-            name: formData.fullName || 'Valued Collector',
-            email: formData.email || 'collector@wristloom.com',
-            contact: formData.phone || '+91 98765 43210',
+            name: formData.fullName || session?.user?.name || 'Valued Collector',
+            email: formData.email || session?.user?.email || 'collector@wristloom.com',
+            contact: formData.phone || (session?.user as any)?.phone || '+91 98765 43210',
           },
           notes: {
             orderReference: createdOrder.orderReference,
@@ -242,9 +256,9 @@ export default function CartPage() {
                   items: [...items],
                   subtotal,
                   shipping: {
-                    name: formData.fullName || 'Valued Collector',
-                    email: formData.email || 'collector@wristloom.com',
-                    phone: formData.phone || '+91 98765 43210',
+                    name: formData.fullName || session?.user?.name || 'Valued Collector',
+                    email: formData.email || session?.user?.email || 'collector@wristloom.com',
+                    phone: formData.phone || (session?.user as any)?.phone || '+91 98765 43210',
                     address: formData.addressLine || 'Private Atelier Residence',
                     city: formData.city || 'Mumbai',
                   },
@@ -265,59 +279,28 @@ export default function CartPage() {
           },
         });
 
+        // Safe diagnostics capture on payment failure
+        rzp.on('payment.failed', function (response: any) {
+          console.error('[Razorpay Payment Failed Diagnostic]:', {
+            code: response?.error?.code,
+            description: response?.error?.description,
+            source: response?.error?.source,
+            step: response?.error?.step,
+            reason: response?.error?.reason,
+            order_id: response?.error?.metadata?.order_id,
+            payment_id: response?.error?.metadata?.payment_id,
+          });
+          setIsSubmitting(false);
+          const reasonText = response?.error?.description || response?.error?.reason || 'Payment was declined or cancelled.';
+          setErrorMsg(`Payment Failed: ${reasonText} (Code: ${response?.error?.code || 'GATEWAY_ERROR'})`);
+        });
+
         rzp.open();
       } else {
         throw new Error('Razorpay client modal could not be launched.');
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Error processing reservation details');
-      setIsSubmitting(false);
-    }
-  };
-
-  // Fallback demo authorization for test verification
-  const handleSimulateDemoPayment = async () => {
-    if (!activeOrderId) return;
-    setIsSubmitting(true);
-    setErrorMsg(null);
-
-    try {
-      const verifyRes = await fetch('/api/payments/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: activeOrderId,
-          paymentMethod: 'demo_test_gateway',
-          razorpay_payment_id: `pay_test_${Date.now()}`,
-          razorpay_signature: 'test_demo_signature_ok',
-        }),
-      });
-
-      const verifyData = await verifyRes.json();
-      if (!verifyRes.ok || !verifyData.success) {
-        throw new Error(verifyData.error ?? 'Test authorization could not be completed.');
-      }
-
-      setOrderConfirmed({
-        id: activeOrderReference || activeOrderId,
-        items: [...items],
-        subtotal,
-        shipping: {
-          name: formData.fullName || 'Valued Collector',
-          email: formData.email || 'collector@wristloom.com',
-          phone: formData.phone || '+91 98765 43210',
-          address: formData.addressLine || 'Private Atelier Residence',
-          city: formData.city || 'Mumbai',
-        },
-        paymentMethod: 'Razorpay Test Sandbox',
-        paymentStatus: 'FULLY_PAID',
-        transactionId: verifyData.paymentId,
-      });
-      clearCart();
-      setIsCheckoutOpen(false);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Payment authorization declined');
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -791,18 +774,6 @@ export default function CartPage() {
                       </>
                     )}
                   </button>
-
-                  {/* Sandbox test button if order created */}
-                  {activeOrderId && (
-                    <button
-                      type="button"
-                      disabled={isSubmitting}
-                      onClick={handleSimulateDemoPayment}
-                      className="w-full py-2 rounded bg-[#14110F] border border-[rgba(176,141,87,0.2)] text-[rgba(237,230,214,0.6)] hover:text-[#EDE6D6] font-mono text-xs transition-colors cursor-pointer"
-                    >
-                      Authorize via Sandbox Demo ({formatCurrency(subtotal)})
-                    </button>
-                  )}
 
                   <div className="flex items-center justify-between text-[10px] text-[rgba(237,230,214,0.4)] pt-1">
                     <span className="flex items-center gap-1">

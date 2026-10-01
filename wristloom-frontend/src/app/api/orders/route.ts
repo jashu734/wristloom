@@ -92,19 +92,30 @@ export async function POST(req: NextRequest) {
     const parsed = createOrderSchema.parse(body);
 
     // 1. Fetch real products from database to calculate server-side prices
-    const productIds = parsed.items.map((i: any) => i.productId);
+    const productKeys = parsed.items.map((i: any) => i.productId);
     const dbProducts = await db.product.findMany({
-      where: { id: { in: productIds } },
+      where: {
+        OR: [
+          { id: { in: productKeys } },
+          { slug: { in: productKeys } },
+          { referenceNumber: { in: productKeys } },
+        ],
+      },
     });
 
-    const dbProductMap = new Map<string, any>(dbProducts.map((p: any) => [p.id, p]));
+    const dbProductMap = new Map<string, any>();
+    for (const p of dbProducts) {
+      dbProductMap.set(p.id, p);
+      if (p.slug) dbProductMap.set(p.slug, p);
+      if (p.referenceNumber) dbProductMap.set(p.referenceNumber, p);
+    }
 
     // 2. Inventory & Stock Validation
     const inventoryCheck = await verifyAndReserveInventory(
       parsed.items.map((item: any) => {
         const prod = dbProductMap.get(item.productId);
         return {
-          productId: item.productId,
+          productId: prod?.id || item.productId,
           name: prod?.name || item.productId,
           quantity: item.quantity,
         };
@@ -123,7 +134,7 @@ export async function POST(req: NextRequest) {
       const dbProd = dbProductMap.get(item.productId);
       if (!dbProd) {
         return NextResponse.json(
-          { error: `Timepiece ${item.productId} was not found in our collection.` },
+          { error: `Timepiece "${item.productId}" was not found in our collection.` },
           { status: 404 }
         );
       }

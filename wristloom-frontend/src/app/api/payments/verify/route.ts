@@ -76,10 +76,17 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Secure HMAC signature check if gateway credentials provided
-      if (razorpay_order_id && razorpay_payment_id && razorpay_signature) {
+      // Secure HMAC signature check if gateway credentials provided or paymentMethod is razorpay
+      if (paymentMethod === 'razorpay' || razorpay_signature) {
+        if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+          return NextResponse.json(
+            { error: 'Incomplete Razorpay payment verification parameters. Missing order_id, payment_id, or signature.' },
+            { status: 400 }
+          );
+        }
         const isValid = verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature);
         if (!isValid) {
+          console.error('[Verify Payment Error] Invalid Razorpay signature:', { razorpay_order_id, razorpay_payment_id });
           return NextResponse.json({ error: 'Invalid payment signature from gateway' }, { status: 400 });
         }
       }
@@ -147,9 +154,16 @@ export async function POST(req: NextRequest) {
       }
 
       // Secure HMAC signature check if gateway credentials provided
-      if (razorpay_order_id && razorpay_payment_id && razorpay_signature) {
+      if (razorpay_order_id || razorpay_signature) {
+        if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+          return NextResponse.json(
+            { error: 'Incomplete Razorpay payment verification parameters. Missing order_id, payment_id, or signature.' },
+            { status: 400 }
+          );
+        }
         const isValid = verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature);
         if (!isValid) {
+          console.error('[Verify Payment Error] Invalid Razorpay signature on booking:', { razorpay_order_id, razorpay_payment_id });
           return NextResponse.json({ error: 'Invalid payment signature from gateway' }, { status: 400 });
         }
       }

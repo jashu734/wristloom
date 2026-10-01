@@ -132,6 +132,21 @@ export function Step6Payment() {
         },
       });
 
+      rzp.on('payment.failed', function (response: any) {
+        console.error('[Razorpay Booking Payment Failed Diagnostic]:', {
+          code: response?.error?.code,
+          description: response?.error?.description,
+          source: response?.error?.source,
+          step: response?.error?.step,
+          reason: response?.error?.reason,
+          order_id: response?.error?.metadata?.order_id,
+          payment_id: response?.error?.metadata?.payment_id,
+        });
+        setLoading(false);
+        const reasonText = response?.error?.description || response?.error?.reason || 'Payment was declined or cancelled.';
+        setError(`Payment Failed: ${reasonText} (Code: ${response?.error?.code || 'GATEWAY_ERROR'})`);
+      });
+
       rzp.open();
     } catch (err: any) {
       setError(err.message ?? 'Payment failed. Please try again.');
