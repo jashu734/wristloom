@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
 
   // Remote image optimization domains
   images: {
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 86400,
     remotePatterns: [
       {
         protocol: 'https',

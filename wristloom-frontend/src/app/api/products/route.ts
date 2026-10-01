@@ -45,9 +45,6 @@ const createProductSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await auth();
-    const isAdmin = isUserAdmin(session?.user);
-
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('q');
     const brand = searchParams.get('brand');
@@ -56,6 +53,12 @@ export async function GET(req: NextRequest) {
     const condition = searchParams.get('condition');
     const sort = searchParams.get('sort');
     const includeInactive = searchParams.get('includeInactive') === 'true';
+
+    let isAdmin = false;
+    if (includeInactive) {
+      const session = await auth();
+      isAdmin = isUserAdmin(session?.user);
+    }
 
     const where: any = {};
 
@@ -119,7 +122,14 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    return NextResponse.json({ products, total: products.length });
+    return NextResponse.json(
+      { products, total: products.length },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+        },
+      }
+    );
   } catch (error: any) {
     console.error('[Products GET Error]', error);
     return NextResponse.json({ error: error.message ?? 'Failed to fetch products' }, { status: 500 });

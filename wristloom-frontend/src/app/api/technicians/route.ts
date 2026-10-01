@@ -1,13 +1,23 @@
 // ============================================================
 // Wristloom — Technicians API Route (Next.js)
 // ============================================================
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { auth } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const session = await auth();
-    const isAdmin = session?.user?.role === 'ADMIN';
+    const hasAuthCookie =
+      req.cookies.has('authjs.session-token') ||
+      req.cookies.has('__Secure-authjs.session-token') ||
+      req.cookies.has('next-auth.session-token') ||
+      req.cookies.has('__Secure-next-auth.session-token');
+
+    let isAdmin = false;
+    if (hasAuthCookie) {
+      const session = await auth();
+      isAdmin = session?.user?.role === 'ADMIN';
+    }
 
     const technicians = await db.technician.findMany({
       select: {
@@ -38,8 +48,13 @@ export async function GET() {
       orderBy: { rating: 'desc' },
     });
 
+    const headers: Record<string, string> = {};
+    if (!isAdmin) {
+      headers['Cache-Control'] = 'public, s-maxage=60, stale-while-revalidate=300';
+    }
+
     if (technicians.length > 0) {
-      return NextResponse.json(technicians);
+      return NextResponse.json(technicians, { headers });
     }
 
     // Default fallback roster if no technicians in DB
@@ -84,8 +99,6 @@ export async function GET() {
     return NextResponse.json({ error: err.message ?? 'Failed to fetch technicians' }, { status: 500 });
   }
 }
-
-import { auth } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 

@@ -26,80 +26,43 @@ export default async function AdminDashboardPage() {
     totalCustomers,
     totalTechnicians,
     totalProducts,
-    totalOrders,
-    pendingOrders,
-    totalBookings,
-    pendingBookings,
-    completedServices,
-    orderRevenueSum,
-    serviceRevenueSum,
-    todayOrderRev,
-    weekOrderRev,
-    monthOrderRev,
-    yearOrderRev,
-    todayServiceRev,
-    weekServiceRev,
-    monthServiceRev,
-    yearServiceRev,
+    [orderStatsRaw],
+    [bookingStatsRaw],
     recentOrders,
     lowStockProducts,
     recentBookings,
-  ] = await Promise.all([
+  ]: any = await Promise.all([
     db.user.count(),
     db.user.count({ where: { role: 'CUSTOMER' } }),
     db.technician.count(),
     db.product.count(),
-    db.order.count(),
-    db.order.count({ where: { status: 'PENDING' } }),
-    db.repairBooking.count(),
-    db.repairBooking.count({ where: { status: 'PENDING' } }),
-    db.repairBooking.count({ where: { status: 'COMPLETED' } }),
 
-    // All time revenue
-    db.order.aggregate({
-      where: { paymentStatus: { in: ['FULLY_PAID', 'DEPOSIT_PAID'] } },
-      _sum: { totalAmount: true },
-    }),
-    db.repairBooking.aggregate({
-      where: { paymentStatus: { in: ['DEPOSIT_PAID', 'FULLY_PAID'] } },
-      _sum: { depositAmount: true },
-    }),
+    // Consolidated Order statistics and revenue windows in 1 SQL query
+    db.$queryRaw`
+      SELECT
+        COUNT(*)::int as total_orders,
+        COUNT(CASE WHEN status = 'PENDING' THEN 1 END)::int as pending_orders,
+        COALESCE(SUM(CASE WHEN payment_status IN ('FULLY_PAID', 'DEPOSIT_PAID') THEN total_amount ELSE 0 END), 0)::float as order_revenue_sum,
+        COALESCE(SUM(CASE WHEN created_at >= ${startOfToday} AND payment_status IN ('FULLY_PAID', 'DEPOSIT_PAID') THEN total_amount ELSE 0 END), 0)::float as today_order_rev,
+        COALESCE(SUM(CASE WHEN created_at >= ${startOf7DaysAgo} AND payment_status IN ('FULLY_PAID', 'DEPOSIT_PAID') THEN total_amount ELSE 0 END), 0)::float as week_order_rev,
+        COALESCE(SUM(CASE WHEN created_at >= ${startOf30DaysAgo} AND payment_status IN ('FULLY_PAID', 'DEPOSIT_PAID') THEN total_amount ELSE 0 END), 0)::float as month_order_rev,
+        COALESCE(SUM(CASE WHEN created_at >= ${startOfYear} AND payment_status IN ('FULLY_PAID', 'DEPOSIT_PAID') THEN total_amount ELSE 0 END), 0)::float as year_order_rev
+      FROM orders;
+    `,
 
-    // Orders revenue by time windows
-    db.order.aggregate({
-      where: { createdAt: { gte: startOfToday }, paymentStatus: { in: ['FULLY_PAID', 'DEPOSIT_PAID'] } },
-      _sum: { totalAmount: true },
-    }),
-    db.order.aggregate({
-      where: { createdAt: { gte: startOf7DaysAgo }, paymentStatus: { in: ['FULLY_PAID', 'DEPOSIT_PAID'] } },
-      _sum: { totalAmount: true },
-    }),
-    db.order.aggregate({
-      where: { createdAt: { gte: startOf30DaysAgo }, paymentStatus: { in: ['FULLY_PAID', 'DEPOSIT_PAID'] } },
-      _sum: { totalAmount: true },
-    }),
-    db.order.aggregate({
-      where: { createdAt: { gte: startOfYear }, paymentStatus: { in: ['FULLY_PAID', 'DEPOSIT_PAID'] } },
-      _sum: { totalAmount: true },
-    }),
-
-    // Service revenue by time windows
-    db.repairBooking.aggregate({
-      where: { createdAt: { gte: startOfToday }, paymentStatus: { in: ['DEPOSIT_PAID', 'FULLY_PAID'] } },
-      _sum: { depositAmount: true },
-    }),
-    db.repairBooking.aggregate({
-      where: { createdAt: { gte: startOf7DaysAgo }, paymentStatus: { in: ['DEPOSIT_PAID', 'FULLY_PAID'] } },
-      _sum: { depositAmount: true },
-    }),
-    db.repairBooking.aggregate({
-      where: { createdAt: { gte: startOf30DaysAgo }, paymentStatus: { in: ['DEPOSIT_PAID', 'FULLY_PAID'] } },
-      _sum: { depositAmount: true },
-    }),
-    db.repairBooking.aggregate({
-      where: { createdAt: { gte: startOfYear }, paymentStatus: { in: ['DEPOSIT_PAID', 'FULLY_PAID'] } },
-      _sum: { depositAmount: true },
-    }),
+    // Consolidated Service booking statistics and revenue windows in 1 SQL query
+    db.$queryRaw`
+      SELECT
+        COUNT(*)::int as total_bookings,
+        COUNT(CASE WHEN status = 'PENDING' THEN 1 END)::int as pending_bookings,
+        COUNT(CASE WHEN status = 'COMPLETED' THEN 1 END)::int as completed_services,
+        COALESCE(SUM(CASE WHEN "paymentStatus" IN ('DEPOSIT_PAID', 'FULLY_PAID') THEN "depositAmount" ELSE 0 END), 0)::float as service_revenue_sum,
+        COALESCE(SUM(CASE WHEN "createdAt" >= ${startOfToday} AND "paymentStatus" IN ('DEPOSIT_PAID', 'FULLY_PAID') THEN "depositAmount" ELSE 0 END), 0)::float as today_service_rev,
+        COALESCE(SUM(CASE WHEN "createdAt" >= ${startOf7DaysAgo} AND "paymentStatus" IN ('DEPOSIT_PAID', 'FULLY_PAID') THEN "depositAmount" ELSE 0 END), 0)::float as week_service_rev,
+        COALESCE(SUM(CASE WHEN "createdAt" >= ${startOf30DaysAgo} AND "paymentStatus" IN ('DEPOSIT_PAID', 'FULLY_PAID') THEN "depositAmount" ELSE 0 END), 0)::float as month_service_rev,
+        COALESCE(SUM(CASE WHEN "createdAt" >= ${startOfYear} AND "paymentStatus" IN ('DEPOSIT_PAID', 'FULLY_PAID') THEN "depositAmount" ELSE 0 END), 0)::float as year_service_rev
+      FROM repair_bookings;
+    `,
 
     // Recent Orders
     db.order.findMany({
@@ -139,11 +102,17 @@ export default async function AdminDashboardPage() {
     }),
   ]);
 
-  const totalRevenue = (orderRevenueSum._sum?.totalAmount || 0) + (serviceRevenueSum._sum?.depositAmount || 0);
-  const todayRevenue = (todayOrderRev._sum?.totalAmount || 0) + (todayServiceRev._sum?.depositAmount || 0);
-  const weekRevenue = (weekOrderRev._sum?.totalAmount || 0) + (weekServiceRev._sum?.depositAmount || 0);
-  const monthRevenue = (monthOrderRev._sum?.totalAmount || 0) + (monthServiceRev._sum?.depositAmount || 0);
-  const yearRevenue = (yearOrderRev._sum?.totalAmount || 0) + (yearServiceRev._sum?.depositAmount || 0);
+  const totalOrders = orderStatsRaw?.total_orders ?? 0;
+  const pendingOrders = orderStatsRaw?.pending_orders ?? 0;
+  const totalBookings = bookingStatsRaw?.total_bookings ?? 0;
+  const pendingBookings = bookingStatsRaw?.pending_bookings ?? 0;
+  const completedServices = bookingStatsRaw?.completed_services ?? 0;
+
+  const totalRevenue = (orderStatsRaw?.order_revenue_sum ?? 0) + (bookingStatsRaw?.service_revenue_sum ?? 0);
+  const todayRevenue = (orderStatsRaw?.today_order_rev ?? 0) + (bookingStatsRaw?.today_service_rev ?? 0);
+  const weekRevenue = (orderStatsRaw?.week_order_rev ?? 0) + (bookingStatsRaw?.week_service_rev ?? 0);
+  const monthRevenue = (orderStatsRaw?.month_order_rev ?? 0) + (bookingStatsRaw?.month_service_rev ?? 0);
+  const yearRevenue = (orderStatsRaw?.year_order_rev ?? 0) + (bookingStatsRaw?.year_service_rev ?? 0);
 
   const chartTimeline = [];
   for (let i = 6; i >= 0; i--) {

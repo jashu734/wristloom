@@ -7,6 +7,7 @@ import { Badge } from '@/components/primitives/Badge';
 import { Button } from '@/components/primitives/Button';
 import { WATCH_BRANDS } from '@/lib/constants';
 import Link from 'next/link';
+import Image from 'next/image';
 import { SlidersHorizontal, X, ArrowRight, Heart, Search, ShoppingBag, Check } from 'lucide-react';
 import { useWishlistStore } from '@/store/wishlistStore';
 import { useCartStore } from '@/store/cartStore';
@@ -21,12 +22,12 @@ interface Filters {
   sort: 'newest' | 'price-asc' | 'price-desc' | 'name-asc';
 }
 
-export function ShopGrid() {
+export function ShopGrid({ initialProducts = [] }: { initialProducts?: any[] }) {
   const { isInWishlist, toggleItem } = useWishlistStore();
   const addItem = useCartStore((s) => s.addItem);
 
-  const [loading, setLoading] = React.useState(true);
-  const [products, setProducts] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(initialProducts.length === 0);
+  const [products, setProducts] = React.useState<any[]>(initialProducts);
   const [addedIds, setAddedIds] = React.useState<Record<string, boolean>>({});
 
   const [filters, setFilters] = React.useState<Filters>({
@@ -39,6 +40,7 @@ export function ShopGrid() {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
   React.useEffect(() => {
+    if (initialProducts.length > 0) return;
     fetch('/api/products')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
@@ -392,12 +394,14 @@ export function ShopGrid() {
                       className="flex-1 flex flex-col cursor-pointer"
                       aria-label={`${product.brand} ${product.modelName || product.name}`}
                     >
-                      {/* [Correct Product Image] */}
+                      {/* [Optimized Product Image] */}
                       <div className="aspect-square overflow-hidden bg-[#14110F] relative flex items-center justify-center p-4">
-                        <img
+                        <Image
                           src={imageUrl}
                           alt={`${product.brand} ${product.modelName || product.name} ${product.referenceNumber || ''}`}
-                          className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
+                          fill
+                          sizes="(max-width: 640px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          className="object-contain p-4 transition-transform duration-500 group-hover:scale-105"
                           loading="lazy"
                         />
                       </div>

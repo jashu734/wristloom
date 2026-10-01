@@ -54,33 +54,53 @@ const STATUS_COLORS: Record<BookingStatus, string> = {
   IN_PROGRESS: 'certified', COMPLETED: 'excellent', CANCELLED: 'oxblood',
 };
 
-export function TechnicianDashboard({ userId, userName }: { userId: string; userName: string }) {
-  const [bookings, setBookings] = React.useState<Booking[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [isAvailable, setIsAvailable] = React.useState(true);
+export function TechnicianDashboard({
+  userId,
+  userName,
+  initialBookings = [],
+  initialTechId = null,
+  initialAvailable = true,
+}: {
+  userId: string;
+  userName: string;
+  initialBookings?: Booking[];
+  initialTechId?: string | null;
+  initialAvailable?: boolean;
+}) {
+  const [bookings, setBookings] = React.useState<Booking[]>(initialBookings);
+  const [loading, setLoading] = React.useState(initialBookings.length === 0 && !initialTechId);
+  const [isAvailable, setIsAvailable] = React.useState(initialAvailable);
   const [activeBookingId, setActiveBookingId] = React.useState<string | null>(null);
-  const [techId, setTechId] = React.useState<string | null>(null);
+  const [techId, setTechId] = React.useState<string | null>(initialTechId);
   const [activeTab, setActiveTab] = React.useState<'today' | 'upcoming' | 'completed'>('today');
   const [newJobAlert, setNewJobAlert] = React.useState<string | null>(null);
 
-  // Fetch technician profile + bookings
+  // Fetch technician profile + bookings only if not pre-populated
   React.useEffect(() => {
+    if (initialTechId && initialBookings.length > 0) return;
     async function load() {
-      const [techRes, bookingsRes] = await Promise.all([
-        fetch('/api/technicians'),
-        fetch('/api/bookings'),
-      ]);
-      const techList = await techRes.json();
-      const myTech = Array.isArray(techList) ? techList.find((t: any) => t.userId === userId) : null;
-      if (myTech) {
-        setTechId(myTech.id);
-        setIsAvailable(myTech.isAvailable);
+      try {
+        const [techRes, bookingsRes] = await Promise.all([
+          initialTechId ? null : fetch('/api/technicians'),
+          initialBookings.length > 0 ? null : fetch('/api/bookings'),
+        ]);
+        if (techRes) {
+          const techList = await techRes.json();
+          const myTech = Array.isArray(techList) ? techList.find((t: any) => t.userId === userId) : null;
+          if (myTech) {
+            setTechId(myTech.id);
+            setIsAvailable(myTech.isAvailable);
+          }
+        }
+        if (bookingsRes && bookingsRes.ok) setBookings(await bookingsRes.json());
+      } catch (e) {
+        console.warn('Dashboard background load notice:', e);
+      } finally {
+        setLoading(false);
       }
-      if (bookingsRes.ok) setBookings(await bookingsRes.json());
-      setLoading(false);
     }
     load();
-  }, [userId]);
+  }, [userId, initialTechId, initialBookings.length]);
 
   // Real-time job polling & notification
   React.useEffect(() => {

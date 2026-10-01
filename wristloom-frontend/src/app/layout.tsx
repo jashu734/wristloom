@@ -78,7 +78,7 @@ export default function RootLayout({
       className={`${fraunces.variable} ${inter.variable} ${ibmPlexMono.variable} h-full`}
     >
       <body className="min-h-full flex flex-col antialiased">
-        <SessionProvider>
+        <SessionProvider refetchOnWindowFocus={false}>
           {children}
         </SessionProvider>
       </body>

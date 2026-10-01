@@ -1,5 +1,6 @@
 import * as React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/primitives/Button';
 import { ArrowRight } from 'lucide-react';
 
@@ -15,14 +16,14 @@ export function HeroSection() {
     >
       {/* ─── Background ──────────────────────────────── */}
       <div className="absolute inset-0 bg-[#14110F]">
-        {/* Hero image with gradient overlay */}
-        <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{
-            backgroundImage: 'url(https://images.unsplash.com/photo-1547996160-81dfa63595aa?w=1800&q=90)',
-          }}
-          role="img"
-          aria-label="Close-up of a luxury watch"
+        {/* Next.js optimized hero image with high priority LCP loading */}
+        <Image
+          src="https://images.unsplash.com/photo-1547996160-81dfa63595aa?w=1600&q=80&auto=format"
+          alt="Close-up of an exquisite handcrafted luxury watch"
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-center pointer-events-none select-none"
         />
         {/* Layered gradients for editorial feel */}
         <div className="absolute inset-0 bg-gradient-to-r from-[#14110F] via-[rgba(20,17,15,0.75)] to-transparent" />

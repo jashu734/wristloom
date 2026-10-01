@@ -33,7 +33,7 @@ export function HeaderAuth() {
         setUnread(d.unreadCount ?? 0);
       })
       .catch(() => {});
-  }, [session]);
+  }, [session?.user?.id]);
 
   // Close panels on outside click
   React.useEffect(() => {

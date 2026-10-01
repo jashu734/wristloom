@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { MOCK_PRODUCTS } from '@/lib/mock-data';
 import { formatCurrency } from '@/lib/utils';
@@ -104,13 +105,15 @@ export function FeaturedCollections() {
               href={`/products/${featured.slug}`}
               className="group block relative aspect-[16/10] sm:aspect-[16/9] overflow-hidden bg-[#14110F] p-8 flex items-center justify-center cursor-pointer"
             >
-              <img
+              <Image
                 src={featured.images[0]}
                 alt={`${featured.brand} ${featured.name}`}
-                className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-[1.05]"
-                loading="eager"
+                fill
+                priority
+                sizes="(max-width: 1024px) 100vw, 60vw"
+                className="object-contain p-6 transition-transform duration-700 group-hover:scale-[1.05]"
               />
-              <div className="absolute top-4 right-4">
+              <div className="absolute top-4 right-4 z-10">
                 <Badge variant={featured.condition === 'New' ? 'brass' : 'certified'}>
                   {featured.condition} · Brand New
                 </Badge>
@@ -223,12 +226,14 @@ export function FeaturedCollections() {
                 >
                   <Link
                     href={`/products/${product.slug}`}
-                    className="w-full sm:w-40 h-40 flex-shrink-0 bg-[#14110F] p-3 flex items-center justify-center border-b sm:border-b-0 sm:border-r border-[rgba(176,141,87,0.10)]"
+                    className="relative w-full sm:w-40 h-40 flex-shrink-0 bg-[#14110F] p-3 flex items-center justify-center border-b sm:border-b-0 sm:border-r border-[rgba(176,141,87,0.10)]"
                   >
-                    <img
+                    <Image
                       src={product.images[0]}
                       alt={`${product.brand} ${product.name}`}
-                      className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-[1.06]"
+                      fill
+                      sizes="(max-width: 640px) 100vw, 160px"
+                      className="object-contain p-2 transition-transform duration-500 group-hover:scale-[1.06]"
                       loading="lazy"
                     />
                   </Link>

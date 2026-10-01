@@ -27,8 +27,10 @@ export function HorologicalLoupe({
   const LOUPE_SIZE = 180;
   const ZOOM_FACTOR = 3;
 
+  const animFrameRef = React.useRef<number | null>(null);
+
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!containerRef.current) return;
+    if (!isLoupeActive || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -38,11 +40,14 @@ export function HorologicalLoupe({
       return;
     }
 
-    setIsHovered(true);
-    const bgX = (x / rect.width) * 100;
-    const bgY = (y / rect.height) * 100;
+    if (!isHovered) setIsHovered(true);
 
-    setLoupePos({ x, y, bgX, bgY });
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    animFrameRef.current = requestAnimationFrame(() => {
+      const bgX = (x / rect.width) * 100;
+      const bgY = (y / rect.height) * 100;
+      setLoupePos({ x, y, bgX, bgY });
+    });
   };
 
   // Escapement Acoustic Tick Generator (Web Audio API)
@@ -105,6 +110,7 @@ export function HorologicalLoupe({
 
   React.useEffect(() => {
     return () => {
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       if (intervalRef.current) clearInterval(intervalRef.current);
       if (audioCtxRef.current) audioCtxRef.current.close().catch(() => {});
     };
