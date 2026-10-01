@@ -41,24 +41,25 @@ async function runTest() {
   console.log('PASS: Authenticated as correct customer identity.\n');
 
   // STEP 2: Create Order in Database
-  console.log('--- Step 2: Placing Acquisition Order via /api/orders ---');
+  console.log('--- Step 2: Placing Acquisition Order via /api/orders (₹2,15,000 Rado Captain Cook) ---');
   const orderRes = await fetch(`${PROD_URL}/api/orders`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       items: [
         {
-          productId: 'seiko-presage-cocktail-time-srpb43j1',
+          productId: 'rado-captain-cook-automatic-r32505313',
           quantity: 1,
+          strapOption: null, // Test previously failing null value!
         },
       ],
       shippingName: 'Sai Jashwanth',
       shippingEmail: 'saijashwanth0808@gmail.com',
-      shippingPhone: '+91 98765 43210',
+      shippingPhone: '88765432091',
       shippingAddress: {
-        addressLine: '100 Horizon Atelier Tower',
-        city: 'Mumbai',
-        postalCode: '400001',
+        addressLine: 'Akshaya Samrudhi Nilaya, Site No 46, Nandi Garden, Anekal, Bengaluru',
+        city: 'Bengaluru',
+        postalCode: '562106',
         country: 'India',
       },
       paymentMethod: 'razorpay',
