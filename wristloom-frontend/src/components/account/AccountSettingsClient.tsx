@@ -1,7 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useSession, signOut } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
+import { handleCompleteSignOut } from '@/lib/logout';
 import { useRouter } from 'next/navigation';
 import { User, Bell, Shield, CreditCard, LogOut, ChevronRight, Save, Eye, EyeOff, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/primitives/Button';
@@ -262,7 +263,7 @@ export function AccountSettingsClient() {
                 </button>
               ))}
               <button
-                onClick={() => signOut({ callbackUrl: '/' })}
+                onClick={() => handleCompleteSignOut('/')}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:text-red-300 transition-colors"
               >
                 <LogOut size={14} />

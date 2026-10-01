@@ -26,17 +26,8 @@ import {
 import { Button } from '@/components/primitives/Button';
 import { Badge, HealthBadge } from '@/components/primitives/Badge';
 import { MOCK_VAULT_ITEMS, MOCK_REVIEWS, MOCK_TESTIMONIALS } from '@/lib/mock-data';
+import { handleCompleteSignOut } from '@/lib/logout';
 import { formatCurrency, formatDate } from '@/lib/utils';
-
-// ─── Mock account data ────────────────────────────────────────
-const DEMO_USER = {
-  name: 'Ravi Desai',
-  email: 'ravi.desai@email.com',
-  avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&q=85',
-  member_since: '2022-03-15',
-  credit_balance: 48500,
-  tier: 'Collector',
-};
 
 const RECENT_ACTIVITY = [
   { id: 'act-1', type: 'service', label: 'Full Service & Overhaul completed', sub: 'Titan Edge · Arjun Mehta', date: '2024-11-15', icon: Wrench },
@@ -87,11 +78,12 @@ export function AccountClient() {
       .catch(() => {});
   }, [session?.user]);
 
-  const displayName = profile?.name || session?.user?.name || DEMO_USER.name;
-  const displayEmail = profile?.email || session?.user?.email || DEMO_USER.email;
-  const displayAvatar = profile?.profileImage || session?.user?.image || DEMO_USER.avatar;
-  const displayCredits = realWalletBalance !== null ? realWalletBalance : DEMO_USER.credit_balance;
-  const memberSinceYear = profile?.createdAt ? new Date(profile.createdAt).getFullYear() : new Date(DEMO_USER.member_since).getFullYear();
+  const displayName = profile?.name || session?.user?.name || (session?.user?.email ? session.user.email.split('@')[0] : 'Horology Collector');
+  const displayEmail = profile?.email || session?.user?.email || '';
+  const displayAvatar = profile?.profileImage || session?.user?.image || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&q=85';
+  const displayCredits = realWalletBalance !== null ? realWalletBalance : (profile?.creditWallet?.balance ?? 0);
+  const memberSinceYear = profile?.createdAt ? new Date(profile.createdAt).getFullYear() : (session?.user ? new Date().getFullYear() : 2026);
+  const memberTier = displayCredits >= 50000 ? 'VIP Patron' : displayCredits >= 10000 ? 'Connoisseur' : 'Collector';
 
   return (
     <div className="min-h-screen bg-[#14110F]">
@@ -130,7 +122,7 @@ export function AccountClient() {
                 <p className="font-mono text-[9px] tracking-widest uppercase text-[rgba(237,230,214,0.40)] mb-0.5">
                   Membership
                 </p>
-                <Badge variant="brass" dot>{DEMO_USER.tier}</Badge>
+                <Badge variant="brass" dot>{memberTier}</Badge>
               </div>
             </div>
           </div>
@@ -890,7 +882,7 @@ function SettingsTab({
           <Button
             variant="ghost"
             size="md"
-            onClick={() => signOut({ callbackUrl: '/' })}
+            onClick={() => handleCompleteSignOut('/')}
             className="w-full justify-start gap-3 text-red-400 hover:text-red-300"
           >
             <LogOut className="w-4 h-4" /> Sign Out

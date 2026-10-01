@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { signOut } from 'next-auth/react';
+import { handleCompleteSignOut } from '@/lib/logout';
 import { format, isToday, isTomorrow, parseISO } from 'date-fns';
 import { Badge } from '@/components/primitives/Badge';
 import { Button } from '@/components/primitives/Button';
@@ -220,7 +220,7 @@ export function TechnicianDashboard({
             </button>
 
             <button
-              onClick={() => signOut({ callbackUrl: '/login' })}
+              onClick={() => handleCompleteSignOut('/login')}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-[2px] border border-[rgba(176,141,87,0.25)] text-[rgba(237,230,214,0.60)] hover:text-[#EDE6D6] hover:border-[#B08D57] transition-colors text-xs font-mono cursor-pointer"
               title="Sign out of technician portal"
             >

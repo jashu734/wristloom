@@ -1,7 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useSession, signOut } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
+import { handleCompleteSignOut } from '@/lib/logout';
 import Link from 'next/link';
 import { Bell, User, LogOut, Settings, Wrench, ShieldCheck, Loader2, X } from 'lucide-react';
 
@@ -147,7 +148,7 @@ export function HeaderAuth() {
               )}
               <MenuItem icon={<Settings className="w-3.5 h-3.5" />} label="Settings" href="/account/settings" />
               <button
-                onClick={() => signOut({ callbackUrl: '/' })}
+                onClick={() => handleCompleteSignOut('/')}
                 className="w-full flex items-center gap-2.5 px-4 py-2 text-xs text-red-400 hover:bg-[rgba(237,230,214,0.04)] transition-colors"
               >
                 <LogOut className="w-3.5 h-3.5" />

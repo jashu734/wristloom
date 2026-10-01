@@ -27,6 +27,20 @@ function sanitizeAvatar(url?: string | null): string | null {
   return url;
 }
 
+function extractEmailFromIdToken(idToken?: string | null): string | null {
+  if (!idToken) return null;
+  try {
+    const parts = idToken.split('.');
+    if (parts.length >= 2) {
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+      return payload.email ? String(payload.email).toLowerCase().trim() : null;
+    }
+  } catch (e) {
+    console.error('[auth] Error decoding id_token payload:', e);
+  }
+  return null;
+}
+
 function CustomAuthAdapter(prisma: typeof db) {
   const baseAdapter = PrismaAdapter(prisma);
   return {
@@ -83,11 +97,67 @@ function CustomAuthAdapter(prisma: typeof db) {
         include: { user: true },
       });
       if (!account?.user) return null;
+
+      // Anti-mixup guard: Verify that if the account contains an id_token, the user's email matches it.
+      const tokenEmail = extractEmailFromIdToken(account.id_token);
+      if (tokenEmail && account.user.email?.toLowerCase().trim() !== tokenEmail) {
+        console.error(`[AUTH MISMATCH GUARD] Account ${account.providerAccountId} has tokenEmail=${tokenEmail} but is mapped to user=${account.user.email}. Repairing association immediately.`);
+        let correctUser = await prisma.user.findUnique({ where: { email: tokenEmail } });
+        if (!correctUser) {
+          const isDedicatedAdmin = isAdminEmail(tokenEmail);
+          correctUser = await prisma.user.create({
+            data: {
+              email: tokenEmail,
+              name: tokenEmail.split('@')[0],
+              role: isDedicatedAdmin ? 'ADMIN' : 'CUSTOMER',
+            },
+          });
+          try {
+            if (!isDedicatedAdmin) {
+              await prisma.creditWallet.create({ data: { customerId: correctUser.id, balance: 0 } });
+            }
+          } catch (_) {}
+        }
+        await prisma.account.update({
+          where: { id: account.id },
+          data: { userId: correctUser.id },
+        });
+        return { ...correctUser, image: correctUser.profileImage ?? null };
+      }
+
       return { ...account.user, image: account.user.profileImage ?? null };
     },
     async linkAccount(account: any) {
+      const tokenEmail = extractEmailFromIdToken(account.id_token);
+      let targetUserId = account.userId;
+
+      // Anti-mixup guard: Ensure account is NEVER linked to a user whose email differs from the OAuth identity!
+      if (tokenEmail) {
+        const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
+        if (!targetUser || targetUser.email.toLowerCase().trim() !== tokenEmail) {
+          console.warn(`[AUTH MISMATCH in linkAccount] Refusing to link OAuth token (${tokenEmail}) to mismatched target user (${targetUser?.email}). Resolving correct user.`);
+          let correctUser = await prisma.user.findUnique({ where: { email: tokenEmail } });
+          if (!correctUser) {
+            const isDedicatedAdmin = isAdminEmail(tokenEmail);
+            correctUser = await prisma.user.create({
+              data: {
+                email: tokenEmail,
+                name: tokenEmail.split('@')[0],
+                role: isDedicatedAdmin ? 'ADMIN' : 'CUSTOMER',
+              },
+            });
+            try {
+              if (!isDedicatedAdmin) {
+                await prisma.creditWallet.create({ data: { customerId: correctUser.id, balance: 0 } });
+              }
+            } catch (_) {}
+          }
+          targetUserId = correctUser.id;
+        }
+      }
+
       const sanitized = {
-        userId: account.userId,
+        userId: targetUserId,
         type: account.type,
         provider: account.provider,
         providerAccountId: account.providerAccountId,
@@ -99,6 +169,23 @@ function CustomAuthAdapter(prisma: typeof db) {
         id_token: account.id_token ?? null,
         session_state: account.session_state ?? null,
       };
+
+      const existing = await prisma.account.findUnique({
+        where: {
+          provider_providerAccountId: {
+            provider: account.provider,
+            providerAccountId: account.providerAccountId,
+          },
+        },
+      });
+
+      if (existing) {
+        return (await prisma.account.update({
+          where: { id: existing.id },
+          data: sanitized,
+        })) as any;
+      }
+
       return (await prisma.account.create({ data: sanitized })) as any;
     },
   };
@@ -216,8 +303,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return session;
     },
-    async signIn({ account }: any) {
-      if (account?.provider === 'google') return true;
+    async signIn({ user, account, profile }: any) {
+      if (account?.provider === 'google') {
+        const googleEmail = (profile?.email)?.toLowerCase().trim();
+        const userEmail = (user?.email)?.toLowerCase().trim();
+        if (googleEmail && userEmail && googleEmail !== userEmail) {
+          console.error(`[signIn callback] Google email (${googleEmail}) does not match user email (${userEmail}). Rejecting mismatched sign in!`);
+          return false;
+        }
+      }
       return true;
     },
   },
