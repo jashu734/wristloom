@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { db } from '@/lib/db';
-import { registerLimiter } from '@/lib/rate-limit';
+import { registerLimiter, createRateLimitResponse } from '@/lib/rate-limit';
 import { getClientIp } from '@/lib/http';
 import { isAdminEmail } from '@/lib/roles';
 
@@ -22,10 +22,10 @@ export async function POST(req: NextRequest) {
     const ip = getClientIp(req);
     const limit = await registerLimiter.check(5, ip);
     if (!limit.success) {
-      return NextResponse.json(
-        { error: 'Too many registration attempts. Please wait a moment.' },
-        { status: 429 }
-      );
+      return createRateLimitResponse(
+        limit.retryAfterSeconds,
+        'Too many registration attempts. Please wait a moment.'
+      ) as unknown as NextResponse;
     }
 
     const body = await req.json();

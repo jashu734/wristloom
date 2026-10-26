@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { db } from '@/lib/db';
-import { loginLimiter } from '@/lib/rate-limit';
+import { loginLimiter, createRateLimitResponse } from '@/lib/rate-limit';
 import { getClientIp } from '@/lib/http';
 import { isAdminEmail } from '@/lib/roles';
 
@@ -26,10 +26,10 @@ export async function POST(req: NextRequest) {
     const ip = getClientIp(req);
     const ipLimit = await loginLimiter.check(15, ip);
     if (!ipLimit.success) {
-      return NextResponse.json(
-        { error: 'Too many sign-in attempts. Please wait a moment.' },
-        { status: 429 }
-      );
+      return createRateLimitResponse(
+        ipLimit.retryAfterSeconds,
+        'Too many sign-in attempts. Please wait a moment.'
+      ) as unknown as NextResponse;
     }
 
     const body = await req.json();
@@ -45,10 +45,10 @@ export async function POST(req: NextRequest) {
     // Per-account rate limiting (prevents targeted credential stuffing)
     const accountLimit = await loginLimiter.check(10, `acct_${email}`);
     if (!accountLimit.success) {
-      return NextResponse.json(
-        { error: 'Too many attempts for this account. Please wait a minute.' },
-        { status: 429 }
-      );
+      return createRateLimitResponse(
+        accountLimit.retryAfterSeconds,
+        'Too many attempts for this account. Please wait a minute.'
+      ) as unknown as NextResponse;
     }
 
     const user = await db.user.findUnique({
@@ -97,9 +97,21 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('[Verify Login Error]', error);
+
+    const isDbUnreachable =
+      error?.message?.includes('ENOTFOUND') ||
+      error?.message?.includes('tenant/user') ||
+      error?.message?.includes("Can't reach database") ||
+      error?.code === 'P2039' ||
+      error?.code === 'P1001';
+
     return NextResponse.json(
-      { error: 'Authentication verification failed. Please try again.' },
-      { status: 500 }
+      {
+        error: isDbUnreachable
+          ? 'Database connection unavailable. Your Supabase project may be paused or unreachable. Please restore it in your Supabase dashboard.'
+          : 'Authentication verification failed. Please try again.',
+      },
+      { status: isDbUnreachable ? 503 : 500 }
     );
   }
 }

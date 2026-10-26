@@ -11,7 +11,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[#14110F] flex flex-col items-center justify-center px-4">
       {/* Logo */}
-      <Link href="/" className="mb-10">
+      <Link href="/" prefetch={false} className="mb-10">
         <span className="font-display text-2xl text-[#EDE6D6] tracking-tight">Wristloom</span>
       </Link>
 
@@ -23,7 +23,7 @@ export default function LoginPage() {
         <LoginForm />
         <p className="text-center text-sm text-[rgba(237,230,214,0.40)] mt-6">
           Don&apos;t have an account?{' '}
-          <Link href="/register" className="text-[#B08D57] hover:underline">
+          <Link href="/register" prefetch={false} className="text-[#B08D57] hover:underline">
             Create one
           </Link>
         </p>

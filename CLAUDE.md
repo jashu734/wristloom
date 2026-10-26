@@ -1,0 +1,2 @@
+# Project: Wristloom
+@AGENTS.md

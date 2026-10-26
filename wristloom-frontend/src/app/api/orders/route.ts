@@ -76,16 +76,32 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const orders = await db.order.findMany({
-      where,
-      include: {
-        orderItems: true,
-        user: { select: { id: true, name: true, email: true, phone: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
+    const skip = (page - 1) * limit;
 
-    return NextResponse.json({ orders, total: orders.length });
+    const [total, orders] = await Promise.all([
+      db.order.count({ where }),
+      db.order.findMany({
+        where,
+        include: {
+          orderItems: true,
+          user: { select: { id: true, name: true, email: true, phone: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return NextResponse.json({
+      orders,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      hasMore: skip + orders.length < total,
+    });
   } catch (error: any) {
     console.error('[Orders GET Error]', error);
     return NextResponse.json({ error: error.message ?? 'Failed to fetch orders' }, { status: 500 });

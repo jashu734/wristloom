@@ -28,12 +28,17 @@ const bookingSchema = z.object({
   notes: z.string().trim().max(1000).optional(),
 });
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json([]);
+      return NextResponse.json({ bookings: [], total: 0 });
     }
+
+    const { searchParams } = new URL(req.url);
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
+    const skip = (page - 1) * limit;
 
     const isAdmin = session.user.role === 'ADMIN';
     const isTech = session.user.role === 'TECHNICIAN';
@@ -55,23 +60,35 @@ export async function GET() {
       where = { customerId: session.user.id };
     }
 
-    const bookings = await db.repairBooking.findMany({
-      where,
-      include: {
-        address: true,
-        customer: { select: { id: true, name: true, phone: true, email: true, profileImage: true } },
-        technician: {
-          include: {
-            user: {
-              select: { name: true, phone: true, profileImage: true },
+    const [total, bookings] = await Promise.all([
+      db.repairBooking.count({ where }),
+      db.repairBooking.findMany({
+        where,
+        include: {
+          address: true,
+          customer: { select: { id: true, name: true, phone: true, email: true, profileImage: true } },
+          technician: {
+            include: {
+              user: {
+                select: { name: true, phone: true, profileImage: true },
+              },
             },
           },
         },
-      },
-      orderBy: { scheduledDate: 'desc' },
-    });
+        orderBy: { scheduledDate: 'desc' },
+        skip,
+        take: limit,
+      }),
+    ]);
 
-    return NextResponse.json(bookings);
+    return NextResponse.json({
+      bookings,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      hasMore: skip + bookings.length < total,
+    });
   } catch (err: any) {
     console.error('[Bookings GET Error]', err);
     return NextResponse.json({ error: err.message ?? 'Failed to fetch bookings' }, { status: 500 });

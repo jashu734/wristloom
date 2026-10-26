@@ -37,6 +37,8 @@ export function LoginForm() {
       setServerError('Your session has expired. Please sign in again.');
     } else if (errorParam === 'CredentialsSignin') {
       setServerError('Invalid email or password.');
+    } else if (errorParam === 'Configuration') {
+      setServerError('Database connection unavailable. Your Supabase project may be paused or unreachable. Please check your Supabase dashboard to restore it.');
     } else if (errorParam) {
       setServerError('Sign-in failed. Please try again.');
     }

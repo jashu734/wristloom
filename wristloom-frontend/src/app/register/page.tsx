@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-[#14110F] flex flex-col items-center justify-center px-4 py-12">
-      <Link href="/" className="mb-10">
+      <Link href="/" prefetch={false} className="mb-10">
         <span className="font-display text-2xl text-[#EDE6D6] tracking-tight">Wristloom</span>
       </Link>
 
@@ -22,7 +22,7 @@ export default function RegisterPage() {
         <RegisterForm />
         <p className="text-center text-sm text-[rgba(237,230,214,0.40)] mt-6">
           Already have an account?{' '}
-          <Link href="/login" className="text-[#B08D57] hover:underline">
+          <Link href="/login" prefetch={false} className="text-[#B08D57] hover:underline">
             Sign in
           </Link>
         </p>

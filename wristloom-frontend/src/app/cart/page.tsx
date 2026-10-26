@@ -614,6 +614,7 @@ export default function CartPage() {
                     <input
                       type="text"
                       required
+                      aria-label="Full Legal Name"
                       placeholder="Full Legal Name"
                       value={formData.fullName}
                       onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
@@ -624,6 +625,7 @@ export default function CartPage() {
                     <input
                       type="email"
                       required
+                      aria-label="Email Address"
                       placeholder="Email Address"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -632,6 +634,7 @@ export default function CartPage() {
                     <input
                       type="tel"
                       required
+                      aria-label="Mobile Phone Number"
                       placeholder="Mobile Number"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
@@ -646,6 +649,7 @@ export default function CartPage() {
                     <input
                       type="text"
                       required
+                      aria-label="Street Address or Residence"
                       placeholder="Street Address / Residence"
                       value={formData.addressLine}
                       onChange={(e) => setFormData({ ...formData, addressLine: e.target.value })}
@@ -654,6 +658,7 @@ export default function CartPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <select
+                      aria-label="Delivery City"
                       value={formData.city}
                       onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                       className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.2)] rounded px-3 py-2 text-sm text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
@@ -665,6 +670,7 @@ export default function CartPage() {
                     <input
                       type="text"
                       required
+                      aria-label="Postal PIN Code"
                       placeholder="PIN Code"
                       value={formData.postalCode}
                       onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}

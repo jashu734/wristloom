@@ -33,3 +33,27 @@ export function verifyRazorpaySignature(
     return false;
   }
 }
+
+export function verifyRazorpayWebhookSignature(
+  rawBody: string,
+  signature: string,
+  secret?: string
+): boolean {
+  const webhookSecret = secret || process.env.RAZORPAY_WEBHOOK_SECRET || process.env.RAZORPAY_KEY_SECRET;
+  if (!webhookSecret) {
+    console.error('[Payment Error] Neither RAZORPAY_WEBHOOK_SECRET nor RAZORPAY_KEY_SECRET is configured.');
+    return false;
+  }
+
+  const generated = crypto
+    .createHmac('sha256', webhookSecret)
+    .update(rawBody)
+    .digest('hex');
+
+  try {
+    return crypto.timingSafeEqual(Buffer.from(generated), Buffer.from(signature));
+  } catch {
+    return false;
+  }
+}
+
