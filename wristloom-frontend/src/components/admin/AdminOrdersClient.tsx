@@ -47,13 +47,14 @@ const PAYMENT_STATUSES = [
   'REFUNDED',
 ];
 
-export function AdminOrdersClient({ initialOrders }: { initialOrders: any[] }) {
-  const [orders, setOrders] = React.useState<Order[]>(initialOrders);
+export function AdminOrdersClient({ initialOrders = [] }: { initialOrders?: any[] }) {
+  const [orders, setOrders] = React.useState<Order[]>(Array.isArray(initialOrders) ? initialOrders : []);
   const [filterStatus, setFilterStatus] = React.useState('ALL');
   const [search, setSearch] = React.useState('');
   const [updatingId, setUpdatingId] = React.useState<string | null>(null);
 
-  const filtered = orders.filter((o) => {
+  const safeOrders = Array.isArray(orders) ? orders : [];
+  const filtered = safeOrders.filter((o) => {
     if (filterStatus !== 'ALL' && o.status !== filterStatus) return false;
     if (search) {
       const q = search.toLowerCase();

@@ -92,7 +92,10 @@ export function TechnicianDashboard({
             setIsAvailable(myTech.isAvailable);
           }
         }
-        if (bookingsRes && bookingsRes.ok) setBookings(await bookingsRes.json());
+        if (bookingsRes && bookingsRes.ok) {
+          const raw = await bookingsRes.json();
+          setBookings(Array.isArray(raw) ? raw : (raw.bookings || []));
+        }
       } catch (e) {
         console.warn('Dashboard background load notice:', e);
       } finally {
@@ -109,9 +112,11 @@ export function TechnicianDashboard({
       try {
         const res = await fetch('/api/bookings');
         if (res.ok) {
-          const fresh: Booking[] = await res.json();
+          const raw = await res.json();
+          const fresh: Booking[] = Array.isArray(raw) ? raw : (raw.bookings || []);
           setBookings((prev) => {
-            const prevIds = new Set(prev.map((b) => b.id));
+            const safePrev = Array.isArray(prev) ? prev : [];
+            const prevIds = new Set(safePrev.map((b) => b.id));
             const newlyAdded = fresh.filter((b) => !prevIds.has(b.id));
             if (newlyAdded.length > 0) {
               setNewJobAlert(`New service booking assigned: ${newlyAdded[0].watchBrand || 'Watch'} (#${newlyAdded[0].bookingReference})`);
@@ -157,20 +162,21 @@ export function TechnicianDashboard({
     setIsAvailable(next);
   }
 
-  const todayBookings = bookings.filter((b) => isToday(parseISO(b.scheduledDate)));
+  const safeBookings = Array.isArray(bookings) ? bookings : [];
+  const todayBookings = safeBookings.filter((b) => isToday(parseISO(b.scheduledDate)));
   const todayCompleted = todayBookings.filter((b) => b.status === 'COMPLETED').length;
   const todayRemaining = todayBookings.filter((b) => b.status !== 'COMPLETED' && b.status !== 'CANCELLED').length;
   const todayEarnings = todayBookings
     .filter((b) => b.status === 'COMPLETED')
     .reduce((sum, b: any) => sum + (b.finalPrice || b.estimatedPrice || b.depositAmount || 2500), 0);
 
-  const today = bookings
+  const today = safeBookings
     .filter((b) => isToday(parseISO(b.scheduledDate)) && b.status !== 'COMPLETED' && b.status !== 'CANCELLED')
     .sort((a, b) => a.scheduledTimeStart.localeCompare(b.scheduledTimeStart));
-  const upcoming = bookings
+  const upcoming = safeBookings
     .filter((b) => !isToday(parseISO(b.scheduledDate)) && b.status !== 'COMPLETED' && b.status !== 'CANCELLED')
     .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate));
-  const completed = bookings
+  const completed = safeBookings
     .filter((b) => b.status === 'COMPLETED')
     .sort((a, b) => b.scheduledDate.localeCompare(a.scheduledDate));
 

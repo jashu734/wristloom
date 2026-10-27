@@ -26,8 +26,8 @@ export function ShopGrid({ initialProducts = [] }: { initialProducts?: any[] }) 
   const { isInWishlist, toggleItem } = useWishlistStore();
   const addItem = useCartStore((s) => s.addItem);
 
-  const [loading, setLoading] = React.useState(initialProducts.length === 0);
-  const [products, setProducts] = React.useState<any[]>(initialProducts);
+  const [loading, setLoading] = React.useState(!Array.isArray(initialProducts) || initialProducts.length === 0);
+  const [products, setProducts] = React.useState<any[]>(Array.isArray(initialProducts) ? initialProducts : []);
   const [addedIds, setAddedIds] = React.useState<Record<string, boolean>>({});
 
   const [filters, setFilters] = React.useState<Filters>({
@@ -109,7 +109,8 @@ export function ShopGrid({ initialProducts = [] }: { initialProducts?: any[] }) 
   };
 
   const filtered = React.useMemo(() => {
-    return products.filter((p) => {
+    const list = Array.isArray(products) ? products : [];
+    return list.filter((p) => {
       // 1. Text Search across Model Name, Reference Number, and Brand
       if (filters.search.trim()) {
         const query = filters.search.toLowerCase().trim();

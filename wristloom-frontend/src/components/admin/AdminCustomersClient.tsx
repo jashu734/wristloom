@@ -19,15 +19,16 @@ interface CustomerItem {
   city: string;
 }
 
-export function AdminCustomersClient({ initialCustomers }: { initialCustomers: CustomerItem[] }) {
-  const [customers, setCustomers] = React.useState<CustomerItem[]>(initialCustomers);
+export function AdminCustomersClient({ initialCustomers = [] }: { initialCustomers?: CustomerItem[] }) {
+  const [customers, setCustomers] = React.useState<CustomerItem[]>(Array.isArray(initialCustomers) ? initialCustomers : []);
   const [search, setSearch] = React.useState('');
 
-  const filtered = customers.filter(
+  const safeCustomers = Array.isArray(customers) ? customers : [];
+  const filtered = safeCustomers.filter(
     (c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.email.toLowerCase().includes(search.toLowerCase()) ||
-      c.phone.includes(search)
+      (c.name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.email || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.phone || '').includes(search)
   );
 
   return (

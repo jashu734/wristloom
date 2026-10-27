@@ -25,16 +25,19 @@ interface NotificationItem {
 }
 
 export function AdminNotificationsClient({
-  initialNotifications,
+  initialNotifications = [],
 }: {
-  initialNotifications: NotificationItem[];
+  initialNotifications?: NotificationItem[];
 }) {
-  const [notifications, setNotifications] = React.useState<NotificationItem[]>(initialNotifications);
+  const [notifications, setNotifications] = React.useState<NotificationItem[]>(
+    Array.isArray(initialNotifications) ? initialNotifications : []
+  );
   const [filter, setFilter] = React.useState<'all' | 'unread'>('all');
   const [isMarking, setIsMarking] = React.useState(false);
 
-  const filtered = notifications.filter((n) => (filter === 'unread' ? !n.read : true));
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const safeNotifications = Array.isArray(notifications) ? notifications : [];
+  const filtered = safeNotifications.filter((n) => (filter === 'unread' ? !n.read : true));
+  const unreadCount = safeNotifications.filter((n) => !n.read).length;
 
   const markAllRead = async () => {
     setIsMarking(true);

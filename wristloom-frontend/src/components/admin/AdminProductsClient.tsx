@@ -37,8 +37,8 @@ const MOVEMENT_TYPES = [
   'Automatic Chronograph',
 ];
 
-export function AdminProductsClient({ initialProducts }: { initialProducts: Product[] }) {
-  const [products, setProducts] = React.useState<Product[]>(initialProducts);
+export function AdminProductsClient({ initialProducts = [] }: { initialProducts?: Product[] }) {
+  const [products, setProducts] = React.useState<Product[]>(Array.isArray(initialProducts) ? initialProducts : []);
 
   // Filters
   const [search, setSearch] = React.useState('');
@@ -52,7 +52,8 @@ export function AdminProductsClient({ initialProducts }: { initialProducts: Prod
 
   // Filtered products list
   const filteredProducts = React.useMemo(() => {
-    return products.filter((p) => {
+    const list = Array.isArray(products) ? products : [];
+    return list.filter((p) => {
       const pModel = (p.modelName || p.name || '').toLowerCase();
       const pBrand = (p.brand || '').toLowerCase();
       const pRef = (p.referenceNumber || '').toLowerCase();

@@ -291,8 +291,10 @@ function OrdersTab() {
           fetch('/api/orders').then((r) => r.ok ? r.json() : { orders: [] }),
           fetch('/api/bookings').then((r) => r.ok ? r.json() : []),
         ]);
-        setOrders(ordersRes.orders ?? []);
-        setBookings(Array.isArray(bookingsRes) ? bookingsRes : []);
+        const safeOrders = Array.isArray(ordersRes) ? ordersRes : (ordersRes?.orders ?? []);
+        const safeBookings = Array.isArray(bookingsRes) ? bookingsRes : (bookingsRes?.bookings ?? []);
+        setOrders(safeOrders);
+        setBookings(safeBookings);
       } catch (e) {
         console.error('Failed to load history', e);
       } finally {

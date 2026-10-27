@@ -81,6 +81,10 @@ export async function GET(req: NextRequest) {
       }),
     ]);
 
+    if (!searchParams.has('page') && !searchParams.has('limit')) {
+      return NextResponse.json(bookings);
+    }
+
     return NextResponse.json({
       bookings,
       total,
