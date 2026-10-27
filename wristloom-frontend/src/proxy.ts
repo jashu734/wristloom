@@ -52,6 +52,8 @@ export async function proxy(req: NextRequest) {
   const isPublic =
     pathname === '/' ||
     pathname.startsWith('/shop') ||
+    pathname.startsWith('/brands') ||
+    pathname.startsWith('/checkout') ||
     pathname.startsWith('/cart') ||
     pathname.startsWith('/wishlist') ||
     pathname.startsWith('/products') ||

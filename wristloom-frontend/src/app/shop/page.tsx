@@ -1,7 +1,9 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { SiteWrapper } from '@/components/layout/SiteWrapper';
 import { ShopGrid } from '@/components/commerce/ShopGrid';
 import { db } from '@/lib/db';
+import { Loader2 } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'Explore Watches',
@@ -45,7 +47,15 @@ export default async function ShopPage() {
           </h1>
         </div>
       </div>
-      <ShopGrid initialProducts={initialProducts} />
+      <Suspense
+        fallback={
+          <div className="min-h-[400px] flex items-center justify-center bg-[#14110F]">
+            <Loader2 className="w-8 h-8 text-[#B08D57] animate-spin" />
+          </div>
+        }
+      >
+        <ShopGrid initialProducts={initialProducts} />
+      </Suspense>
     </SiteWrapper>
   );
 }

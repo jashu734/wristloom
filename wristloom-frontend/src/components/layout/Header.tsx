@@ -84,6 +84,11 @@ export function Header() {
               Shop
             </NavLink>
 
+            {/* Brands */}
+            <NavLink href="/brands" active={pathname.startsWith('/brands')}>
+              Brands
+            </NavLink>
+
             {/* Services — with dropdown */}
             <div
               className="relative"
@@ -190,6 +195,7 @@ export function Header() {
           <nav className="container-wl py-4 space-y-1" aria-label="Mobile navigation">
             {/* Primary links */}
             <MobileNavLink href="/shop">Shop</MobileNavLink>
+            <MobileNavLink href="/brands">Brands</MobileNavLink>
             <div className="font-mono text-[10px] tracking-widest uppercase text-[#B08D57] px-3 pt-3 pb-1">
               Services
             </div>

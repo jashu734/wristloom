@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { SiteWrapper } from '@/components/layout/SiteWrapper';
 import { HeroSection } from '@/components/editorial/HeroSection';
 import { FeaturedCollections } from '@/components/commerce/FeaturedCollections';
+import { BrandShowcaseStrip } from '@/components/commerce/BrandShowcaseStrip';
 import { ServiceEntryPoints } from '@/components/editorial/ServiceEntryPoints';
 import { EcosystemSection } from '@/components/editorial/EcosystemSection';
 import { FeaturedTechnicians } from '@/components/services/FeaturedTechnicians';
@@ -22,7 +23,10 @@ export default function HomePage() {
       {/* 2. Featured Collections — editorial product showcase */}
       <FeaturedCollections />
 
-      {/* 3. Service Entry Points — the ecosystem differentiator */}
+      {/* 3. Authorized Watch Houses Showcase */}
+      <BrandShowcaseStrip />
+
+      {/* 4. Service Entry Points — the ecosystem differentiator */}
       <ServiceEntryPoints />
 
       {/* 4. The Ecosystem — lifecycle narrative */}

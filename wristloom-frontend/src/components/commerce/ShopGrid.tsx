@@ -8,6 +8,7 @@ import { Button } from '@/components/primitives/Button';
 import { WATCH_BRANDS } from '@/lib/constants';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useSearchParams } from 'next/navigation';
 import { SlidersHorizontal, X, ArrowRight, Heart, Search, ShoppingBag, Check } from 'lucide-react';
 import { useWishlistStore } from '@/store/wishlistStore';
 import { useCartStore } from '@/store/cartStore';
@@ -23,8 +24,11 @@ interface Filters {
 }
 
 export function ShopGrid({ initialProducts = [] }: { initialProducts?: any[] }) {
+  const searchParams = useSearchParams();
   const { isInWishlist, toggleItem } = useWishlistStore();
   const addItem = useCartStore((s) => s.addItem);
+
+  const initialBrandParam = searchParams.get('brand');
 
   const [loading, setLoading] = React.useState(!Array.isArray(initialProducts) || initialProducts.length === 0);
   const [products, setProducts] = React.useState<any[]>(Array.isArray(initialProducts) ? initialProducts : []);
@@ -32,13 +36,24 @@ export function ShopGrid({ initialProducts = [] }: { initialProducts?: any[] }) 
 
   const [filters, setFilters] = React.useState<Filters>({
     search: '',
-    brands: [],
+    brands: initialBrandParam ? [initialBrandParam] : [],
     movements: [],
     caseSizes: [],
     sort: 'newest',
   });
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [dynamicBrands, setDynamicBrands] = React.useState<string[]>([...WATCH_BRANDS]);
+
+  // Sync brand filter if query parameter changes
+  React.useEffect(() => {
+    const brand = searchParams.get('brand');
+    if (brand) {
+      setFilters((prev) => ({
+        ...prev,
+        brands: [brand],
+      }));
+    }
+  }, [searchParams]);
 
   // Load active brands dynamically from API
   React.useEffect(() => {
