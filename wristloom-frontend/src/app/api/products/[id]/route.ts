@@ -81,17 +81,37 @@ async function handleUpdateProduct(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
 
-    // Validate brand if provided
+    // Validate brand dynamically against database Brand table if provided
     let matchedBrand = body.brand;
+    let matchedBrandId: string | undefined = undefined;
     if (body.brand) {
-      const allowed = (WATCH_BRANDS as readonly string[]).map((b) => b.toLowerCase());
-      if (!allowed.includes(body.brand.trim().toLowerCase())) {
+      const cleanBrand = body.brand.trim();
+      const brandRecord = await db.brand.findFirst({
+        where: {
+          name: {
+            equals: cleanBrand,
+            mode: 'insensitive',
+          },
+        },
+      });
+
+      if (!brandRecord) {
         return NextResponse.json(
-          { error: `Brand "${body.brand}" is not authorized. Must be one of: ${WATCH_BRANDS.join(', ')}` },
+          { error: `Brand "${body.brand}" is not registered in the atelier database.` },
           { status: 422 }
         );
       }
-      matchedBrand = WATCH_BRANDS.find((b) => b.toLowerCase() === body.brand.trim().toLowerCase()) || body.brand;
+
+      // If switching to a different brand, that brand must be active
+      if (!brandRecord.isActive && brandRecord.id !== existing.brandId) {
+        return NextResponse.json(
+          { error: `Brand "${brandRecord.name}" is currently deactivated. Please activate it in Brand Management before assigning products.` },
+          { status: 422 }
+        );
+      }
+
+      matchedBrand = brandRecord.name;
+      matchedBrandId = brandRecord.id;
     }
 
     // Sync field names
@@ -103,7 +123,10 @@ async function handleUpdateProduct(req: NextRequest, context: RouteContext) {
       updateData.modelName = nameVal;
     }
 
-    if (matchedBrand) updateData.brand = matchedBrand;
+    if (matchedBrand) {
+      updateData.brand = matchedBrand;
+      if (matchedBrandId) updateData.brandId = matchedBrandId;
+    }
 
     if (body.referenceNumber !== undefined) {
       updateData.referenceNumber = String(body.referenceNumber).trim();

@@ -456,6 +456,7 @@ model Product {
   name                   String
   modelName              String?     @map("model_name")
   brand                  String
+  brandId                String?     @map("brand_id")
   referenceNumber        String?     @map("reference_number")
   price                  Float
   purchaseValue          Float?      @map("purchase_value")
@@ -484,13 +485,34 @@ model Product {
   createdAt              DateTime    @default(now()) @map("created_at")
   updatedAt              DateTime    @updatedAt @map("updated_at")
 
+  brandRel               Brand?      @relation(fields: [brandId], references: [id], onDelete: Restrict)
   orderItems             OrderItem[]
   cartItems              CartItem[]
 
   @@index([isActive, createdAt])
   @@index([brand])
+  @@index([brandId])
   @@index([price])
   @@map("products")
+}
+
+model Brand {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  logo        String?
+  description String?   @db.Text
+  websiteUrl  String?   @map("website_url")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  products    Product[]
+
+  @@index([name])
+  @@index([slug])
+  @@index([isActive])
+  @@map("brands")
 }
 
 model Cart {

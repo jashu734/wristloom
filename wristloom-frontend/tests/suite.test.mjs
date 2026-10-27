@@ -441,3 +441,138 @@ describe('Buy Now Direct Checkout & Shopping Cart Isolation', () => {
   });
 });
 
+// ─── 7. Dynamic Watch Brand Management (Layer 7) ────────────────
+describe('Dynamic Watch Brand Management (Layer 7 - Atelier Architecture)', () => {
+  function slugify(text) {
+    return text
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  function validateNewBrand(name, existingBrands) {
+    const clean = (name || '').trim();
+    if (clean.length < 2) {
+      return { valid: false, error: 'Brand name must be at least 2 characters', status: 422 };
+    }
+    const duplicate = existingBrands.find(
+      (b) => b.name.toLowerCase().trim() === clean.toLowerCase()
+    );
+    if (duplicate) {
+      return {
+        valid: false,
+        error: `A brand with the name "${clean}" already exists (ID: ${duplicate.id}).`,
+        status: 409,
+      };
+    }
+    return { valid: true, slug: slugify(clean) };
+  }
+
+  function validateProductBrandAssignment(brandName, brandCatalog) {
+    const clean = (brandName || '').trim().toLowerCase();
+    const brand = brandCatalog.find((b) => b.name.toLowerCase().trim() === clean);
+    if (!brand) {
+      return { allowed: false, error: `Brand "${brandName}" is not registered in the atelier database.` };
+    }
+    if (!brand.isActive) {
+      return { allowed: false, error: `Brand "${brand.name}" is currently deactivated. Please activate it first.` };
+    }
+    return { allowed: true, brandId: brand.id, matchedName: brand.name };
+  }
+
+  function validateBrandDeletion(brand, productCount) {
+    if (productCount > 0) {
+      return {
+        canDelete: false,
+        status: 409,
+        error: `Cannot delete brand "${brand.name}". There are ${productCount} associated timepiece(s) in the catalog. To hide this brand from new product creation and discovery, please deactivate it instead.`,
+      };
+    }
+    return { canDelete: true, status: 200 };
+  }
+
+  it('Admin successfully creates a new brand and generates correct slug', () => {
+    const existing = [{ id: 'b1', name: 'Rolex', slug: 'rolex' }];
+    const result = validateNewBrand('Vacheron Constantin', existing);
+    assert.equal(result.valid, true);
+    assert.equal(result.slug, 'vacheron-constantin');
+  });
+
+  it('Rejects duplicate brand names ignoring case and leading/trailing whitespace', () => {
+    const existing = [
+      { id: 'b1', name: 'Rolex', slug: 'rolex' },
+      { id: 'b2', name: 'Patek Philippe', slug: 'patek-philippe' },
+    ];
+
+    const duplicate1 = validateNewBrand('  rolex  ', existing);
+    assert.equal(duplicate1.valid, false);
+    assert.equal(duplicate1.status, 409);
+    assert.equal(duplicate1.error.includes('already exists'), true);
+
+    const duplicate2 = validateNewBrand('patek philippe', existing);
+    assert.equal(duplicate2.valid, false);
+    assert.equal(duplicate2.status, 409);
+  });
+
+  it('Rejects brand names shorter than 2 characters', () => {
+    const result = validateNewBrand('A', []);
+    assert.equal(result.valid, false);
+    assert.equal(result.status, 422);
+  });
+
+  it('Customer discovery filter only includes active brands', () => {
+    const allBrands = [
+      { id: 'b1', name: 'Rolex', isActive: true },
+      { id: 'b2', name: 'Omega', isActive: true },
+      { id: 'b3', name: 'Sonata', isActive: false }, // Deactivated
+    ];
+
+    const customerVisibleBrands = allBrands.filter((b) => b.isActive);
+    assert.equal(customerVisibleBrands.length, 2);
+    assert.equal(customerVisibleBrands.some((b) => b.name === 'Sonata'), false);
+    assert.equal(customerVisibleBrands.some((b) => b.name === 'Rolex'), true);
+  });
+
+  it('New product creation allows active brands and rejects inactive or unlisted brands', () => {
+    const catalog = [
+      { id: 'b-active', name: 'Breitling', isActive: true },
+      { id: 'b-inactive', name: 'Vintage Brand', isActive: false },
+    ];
+
+    // Allowed active
+    const activeResult = validateProductBrandAssignment('Breitling', catalog);
+    assert.equal(activeResult.allowed, true);
+    assert.equal(activeResult.brandId, 'b-active');
+
+    // Rejected inactive
+    const inactiveResult = validateProductBrandAssignment('Vintage Brand', catalog);
+    assert.equal(inactiveResult.allowed, false);
+    assert.equal(inactiveResult.error.includes('currently deactivated'), true);
+
+    // Rejected unregistered
+    const unknownResult = validateProductBrandAssignment('Unknown Horology', catalog);
+    assert.equal(unknownResult.allowed, false);
+    assert.equal(unknownResult.error.includes('not registered'), true);
+  });
+
+  it('Protects referential integrity by blocking deletion of brands with associated products', () => {
+    const brandWithProducts = { id: 'b-rolex', name: 'Rolex' };
+    const result = validateBrandDeletion(brandWithProducts, 5);
+
+    assert.equal(result.canDelete, false);
+    assert.equal(result.status, 409);
+    assert.equal(result.error.includes('There are 5 associated timepiece(s)'), true);
+    assert.equal(result.error.includes('deactivate it instead'), true);
+  });
+
+  it('Permits safe deletion of brand with zero associated products', () => {
+    const emptyBrand = { id: 'b-new', name: 'Independent Atelier' };
+    const result = validateBrandDeletion(emptyBrand, 0);
+
+    assert.equal(result.canDelete, true);
+    assert.equal(result.status, 200);
+  });
+});
+
+

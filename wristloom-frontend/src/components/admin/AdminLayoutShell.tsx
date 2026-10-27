@@ -7,6 +7,7 @@ import { handleCompleteSignOut } from '@/lib/logout';
 import {
   LayoutDashboard,
   Watch,
+  Award,
   ShoppingBag,
   Users,
   Wrench,
@@ -37,6 +38,7 @@ interface AdminLayoutShellProps {
 const navItems = [
   { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard, exact: true },
   { label: 'Products', href: '/admin/products', icon: Watch },
+  { label: 'Brands', href: '/admin/brands', icon: Award },
   { label: 'Orders', href: '/admin/orders', icon: ShoppingBag },
   { label: 'Customers', href: '/admin/customers', icon: Users },
   { label: 'Technicians', href: '/admin/technicians', icon: Wrench },

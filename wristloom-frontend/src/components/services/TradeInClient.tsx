@@ -60,6 +60,20 @@ export function TradeInClient() {
   const [refNumber, setRefNumber] = React.useState('');
   const [confirmedOffer, setConfirmedOffer] = React.useState<number | null>(null);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
+  const [popularBrands, setPopularBrands] = React.useState<string[]>([...POPULAR_BRANDS]);
+
+  // Load active brands dynamically from API
+  React.useEffect(() => {
+    fetch('/api/brands')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.brands && Array.isArray(d.brands)) {
+          const names: string[] = d.brands.map((b: any) => b.name);
+          if (names.length > 0) setPopularBrands(names);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const [form, setForm] = React.useState({
     watch_brand: 'Seiko',
@@ -162,7 +176,7 @@ export function TradeInClient() {
                   Select Manufacture / Brand <span className="text-[#B08D57]">*</span>
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {POPULAR_BRANDS.map((b) => (
+                  {popularBrands.map((b) => (
                     <button
                       key={b}
                       type="button"

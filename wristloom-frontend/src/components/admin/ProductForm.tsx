@@ -53,6 +53,12 @@ const COMMON_MOVEMENTS = [
 export function ProductForm({ initialData, isEditing = false }: ProductFormProps) {
   const router = useRouter();
 
+  const [availableBrands, setAvailableBrands] = React.useState<string[]>(
+    initialData?.brand
+      ? [initialData.brand, ...(WATCH_BRANDS as readonly string[]).filter((b) => b !== initialData.brand)]
+      : [...WATCH_BRANDS]
+  );
+
   const [formData, setFormData] = React.useState({
     brand: initialData?.brand || WATCH_BRANDS[0],
     modelName: initialData?.modelName || initialData?.name || '',
@@ -66,6 +72,30 @@ export function ProductForm({ initialData, isEditing = false }: ProductFormProps
     isActive: initialData?.isActive !== undefined ? initialData.isActive : true,
     condition: initialData?.condition || 'New',
   });
+
+  // Fetch active brands dynamically from database API
+  React.useEffect(() => {
+    fetch('/api/brands')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.brands && Array.isArray(data.brands)) {
+          const names: string[] = data.brands.map((b: any) => b.name);
+          if (initialData?.brand && !names.includes(initialData.brand)) {
+            names.unshift(initialData.brand);
+          }
+          if (names.length > 0) {
+            setAvailableBrands(names);
+            if (!initialData?.brand) {
+              setFormData((prev) => ({
+                ...prev,
+                brand: prev.brand || names[0],
+              }));
+            }
+          }
+        }
+      })
+      .catch(() => {});
+  }, [initialData?.brand]);
 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isUploading, setIsUploading] = React.useState(false);
@@ -228,7 +258,7 @@ export function ProductForm({ initialData, isEditing = false }: ProductFormProps
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <label className={labelClass}>Brand (12 Authorized Brands) *</label>
+              <label className={labelClass}>Brand *</label>
               <select
                 required
                 name="brand"
@@ -236,7 +266,7 @@ export function ProductForm({ initialData, isEditing = false }: ProductFormProps
                 onChange={handleChange}
                 className={inputClass}
               >
-                {WATCH_BRANDS.map((b) => (
+                {availableBrands.map((b) => (
                   <option key={b} value={b}>
                     {b}
                   </option>

@@ -14,7 +14,7 @@ export const PRIMARY_NAV = [
 export const FOOTER_NAV = {
   SHOP: [
     { label: 'Explore Watches', href: '/shop' },
-    { label: 'Brands', href: '/shop?filter=brands' },
+    { label: 'Brands', href: '/brands' },
     { label: 'Collections', href: '/shop?filter=collections' },
     { label: 'New Arrivals', href: '/shop?filter=new' },
   ],

@@ -46,6 +46,22 @@ export function AdminProductsClient({ initialProducts = [] }: { initialProducts?
   const [selectedMovement, setSelectedMovement] = React.useState('all');
   const [modelSearch, setModelSearch] = React.useState('');
   const [refSearch, setRefSearch] = React.useState('');
+  const [brandsList, setBrandsList] = React.useState<string[]>([...WATCH_BRANDS]);
+
+  // Dynamically load brands for admin catalog filtering
+  React.useEffect(() => {
+    fetch('/api/brands')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.brands && Array.isArray(data.brands)) {
+          const names: string[] = data.brands.map((b: any) => b.name);
+          const productBrands = (products || []).map((p) => p.brand).filter(Boolean);
+          const merged = Array.from(new Set([...names, ...productBrands])).sort();
+          if (merged.length > 0) setBrandsList(merged);
+        }
+      })
+      .catch(() => {});
+  }, [products]);
 
   const [actionLoadingId, setActionLoadingId] = React.useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -228,15 +244,15 @@ export function AdminProductsClient({ initialProducts = [] }: { initialProducts?
           {/* Brand Filter */}
           <div>
             <label className="block text-[10px] font-mono uppercase tracking-wider text-[rgba(237,230,214,0.50)] mb-1">
-              Brand Filter (12 Brands)
+              Brand Filter
             </label>
             <select
               value={selectedBrand}
               onChange={(e) => setSelectedBrand(e.target.value)}
               className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.20)] rounded-[2px] px-3 py-2 text-xs text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
             >
-              <option value="all">All Brands (12 Authorized)</option>
-              {WATCH_BRANDS.map((b) => (
+              <option value="all">All Brands ({brandsList.length})</option>
+              {brandsList.map((b) => (
                 <option key={b} value={b}>
                   {b}
                 </option>

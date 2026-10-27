@@ -38,6 +38,20 @@ export function ShopGrid({ initialProducts = [] }: { initialProducts?: any[] }) 
     sort: 'newest',
   });
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const [dynamicBrands, setDynamicBrands] = React.useState<string[]>([...WATCH_BRANDS]);
+
+  // Load active brands dynamically from API
+  React.useEffect(() => {
+    fetch('/api/brands')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.brands && Array.isArray(d.brands)) {
+          const names: string[] = d.brands.map((b: any) => b.name);
+          if (names.length > 0) setDynamicBrands(names);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   React.useEffect(() => {
     if (initialProducts.length > 0) return;
@@ -262,10 +276,10 @@ export function ShopGrid({ initialProducts = [] }: { initialProducts?: any[] }) 
             </button>
           )}
 
-          {/* Brand Filter (ONLY 12 ALLOWED BRANDS) */}
+          {/* Dynamic Brand Filter */}
           <FilterGroup label="Brand">
             <div className="space-y-0.5 max-h-72 overflow-y-auto pr-1">
-              {WATCH_BRANDS.map((brand) => (
+              {dynamicBrands.map((brand) => (
                 <FilterCheckbox
                   key={brand}
                   label={brand}

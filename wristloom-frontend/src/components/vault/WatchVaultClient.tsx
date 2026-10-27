@@ -29,6 +29,26 @@ export function WatchVaultClient() {
   const [isAuthenticated] = React.useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
+  const [availableBrands, setAvailableBrands] = React.useState<string[]>([...WATCH_BRANDS]);
+
+  // Load active brands dynamically from API
+  React.useEffect(() => {
+    fetch('/api/brands')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.brands && Array.isArray(d.brands)) {
+          const names: string[] = d.brands.map((b: any) => b.name);
+          if (names.length > 0) {
+            setAvailableBrands(names);
+            setNewWatch((prev) => ({
+              ...prev,
+              brand: names[0],
+            }));
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Load real items from database if available
   React.useEffect(() => {
@@ -221,7 +241,7 @@ export function WatchVaultClient() {
                     onChange={(e) => setNewWatch({ ...newWatch, brand: e.target.value })}
                     className="w-full bg-[#14110F] border border-[rgba(176,141,87,0.20)] rounded-[2px] px-3 py-2 text-sm text-[#EDE6D6] focus:border-[#B08D57] focus:outline-none"
                   >
-                    {WATCH_BRANDS.map((b) => (
+                    {availableBrands.map((b) => (
                       <option key={b} value={b}>
                         {b}
                       </option>

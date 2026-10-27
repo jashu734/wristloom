@@ -152,19 +152,33 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const parsed = createProductSchema.parse(body);
 
-    // Validate brand against the 12 allowed brands
-    const allowed = (WATCH_BRANDS as readonly string[]).map((b) => b.toLowerCase());
-    const isBrandAllowed = allowed.includes(parsed.brand.trim().toLowerCase());
+    // Validate brand dynamically against database Brand table
+    const cleanBrandName = parsed.brand.trim();
+    const brandRecord = await db.brand.findFirst({
+      where: {
+        name: {
+          equals: cleanBrandName,
+          mode: 'insensitive',
+        },
+      },
+    });
 
-    if (!isBrandAllowed) {
+    if (!brandRecord) {
       return NextResponse.json(
-        { error: `Brand "${parsed.brand}" is not authorized. Must be one of: ${WATCH_BRANDS.join(', ')}` },
+        { error: `Brand "${parsed.brand}" is not registered. Please create the brand in Brand Management first.` },
         { status: 422 }
       );
     }
 
-    // Resolve matched brand casing
-    const matchedBrand = WATCH_BRANDS.find((b) => b.toLowerCase() === parsed.brand.trim().toLowerCase()) || parsed.brand;
+    if (!brandRecord.isActive) {
+      return NextResponse.json(
+        { error: `Brand "${brandRecord.name}" is currently deactivated. Please activate it in Brand Management before assigning new products.` },
+        { status: 422 }
+      );
+    }
+
+    const matchedBrand = brandRecord.name;
+    const matchedBrandId = brandRecord.id;
 
     const finalPrice = parsed.purchaseValue ?? parsed.price ?? 0;
     if (finalPrice <= 0) {
@@ -199,6 +213,7 @@ export async function POST(req: NextRequest) {
         name: finalModelName,
         modelName: finalModelName,
         brand: matchedBrand,
+        brandId: matchedBrandId,
         slug: finalSlug,
         referenceNumber: String(parsed.referenceNumber).trim(),
         price: finalPrice,
