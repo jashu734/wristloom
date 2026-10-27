@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -357,7 +358,9 @@ function OrdersTab() {
                 if (order.notes && (order.notes.startsWith('{') || order.notes.includes('"trackingNumber"'))) {
                   tracking = JSON.parse(order.notes);
                 }
-              } catch {}
+              } catch {
+                tracking = null;
+              }
 
               const trackingCode = tracking?.trackingNumber || `WLTRK${order.orderReference.replace(/[^0-9]/g, '') || '982341'}`;
               const estDelivery = tracking?.estimatedDelivery || new Date(new Date(order.createdAt).getTime() + 4 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });

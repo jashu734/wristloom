@@ -413,7 +413,6 @@ export function ProductForm({ initialData, isEditing = false }: ProductFormProps
             <div className="flex flex-col items-center justify-center p-3 bg-[#14110F] border border-[rgba(176,141,87,0.15)] rounded-[2px] text-center">
               <div className="w-32 h-32 rounded-[2px] overflow-hidden border border-[rgba(176,141,87,0.20)] bg-[#1a1614] flex items-center justify-center mb-2">
                 {formData.imageUrl ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
                   <img
                     src={formData.imageUrl}
                     alt="Preview"

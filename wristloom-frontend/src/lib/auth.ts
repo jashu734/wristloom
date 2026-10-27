@@ -116,7 +116,9 @@ function CustomAuthAdapter(prisma: typeof db) {
             if (!isDedicatedAdmin) {
               await prisma.creditWallet.create({ data: { customerId: correctUser.id, balance: 0 } });
             }
-          } catch (_) {}
+          } catch (_err) {
+            void _err;
+          }
         }
         await prisma.account.update({
           where: { id: account.id },
@@ -150,7 +152,9 @@ function CustomAuthAdapter(prisma: typeof db) {
               if (!isDedicatedAdmin) {
                 await prisma.creditWallet.create({ data: { customerId: correctUser.id, balance: 0 } });
               }
-            } catch (_) {}
+            } catch (_err) {
+              void _err;
+            }
           }
           targetUserId = correctUser.id;
         }

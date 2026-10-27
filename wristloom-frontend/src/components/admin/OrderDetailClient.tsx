@@ -35,7 +35,9 @@ export function OrderDetailClient({ order: initialOrder }: OrderDetailProps) {
   if (!initialTracking && initialOrder.notes) {
     try {
       if (initialOrder.notes.startsWith('{')) initialTracking = JSON.parse(initialOrder.notes);
-    } catch {}
+    } catch {
+      initialTracking = null;
+    }
   }
 
   const [trackingNumber, setTrackingNumber] = React.useState<string>(
@@ -383,7 +385,6 @@ export function OrderDetailClient({ order: initialOrder }: OrderDetailProps) {
               <div className="flex items-center gap-4">
                 {item.imageUrl ? (
                   <div className="w-14 h-14 rounded-[2px] overflow-hidden border border-[rgba(176,141,87,0.20)] bg-[#14110F] p-1 flex items-center justify-center flex-shrink-0">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={item.imageUrl} alt={item.name} className="w-full h-full object-contain" />
                   </div>
                 ) : (

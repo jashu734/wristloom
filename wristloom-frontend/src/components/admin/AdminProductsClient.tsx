@@ -357,7 +357,6 @@ export function AdminProductsClient({ initialProducts = [] }: { initialProducts?
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 rounded-[2px] border border-[rgba(176,141,87,0.18)] bg-[#14110F] flex items-center justify-center p-1 flex-shrink-0">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={imageSrc}
                               alt={p.name}
