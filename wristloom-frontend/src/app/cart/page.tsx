@@ -554,13 +554,12 @@ export default function CartPage() {
                     variant="primary"
                     size="lg"
                     className="w-full mb-3 cursor-pointer"
-                    onClick={() => {
-                      setErrorMsg(null);
-                      setIsCheckoutOpen(true);
-                    }}
+                    asChild
                   >
-                    Proceed to Checkout
-                    <ArrowRight className="w-4 h-4 ml-2" />
+                    <Link href="/checkout?type=cart">
+                      Proceed to Checkout
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Link>
                   </Button>
                   <Button variant="ghost" size="sm" className="w-full" asChild>
                     <Link href="/shop">Continue Shopping</Link>

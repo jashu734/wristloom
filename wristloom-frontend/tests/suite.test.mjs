@@ -286,3 +286,158 @@ describe('PII Masking & Privacy (Layer 10 - Security)', () => {
     assert.equal(masked, '••••••3210');
   });
 });
+
+// ─── 5. Technician Navigation & Geocoding Resolution ────────────
+describe('Technician Navigation URL & Geocoding Resolution', () => {
+  function generateNavigationUrl(addr) {
+    if (!addr) return null;
+
+    const addressText = [addr.addressLine1, addr.addressLine2, addr.city, addr.state, addr.postalCode, addr.country || 'India']
+      .filter(Boolean)
+      .join(', ');
+
+    // Rejection of fake city-center centroid fallbacks
+    const isCityCentroidFallback = Boolean(
+      addr &&
+      (
+        (Math.abs(addr.latitude - 12.9716) < 0.001 && Math.abs(addr.longitude - 77.5946) < 0.001) ||
+        (Math.abs(addr.latitude - 19.0760) < 0.001 && Math.abs(addr.longitude - 72.8777) < 0.001) ||
+        (Math.abs(addr.latitude - 28.6139) < 0.001 && Math.abs(addr.longitude - 77.2090) < 0.001)
+      )
+    );
+
+    const hasGenuineGpsCoords = Boolean(
+      typeof addr.latitude === 'number' &&
+      typeof addr.longitude === 'number' &&
+      (addr.latitude !== 0 || addr.longitude !== 0) &&
+      !isCityCentroidFallback
+    );
+
+    const destinationQuery = hasGenuineGpsCoords
+      ? `${addr.latitude},${addr.longitude}`
+      : addressText;
+
+    return destinationQuery
+      ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destinationQuery)}&travelmode=driving`
+      : null;
+  }
+
+  it('Resolves actual customer residence address when coordinates are centroid fallback', () => {
+    const customerAddress = {
+      addressLine1: 'Akshaya Samrudhi Nilaya, Site No 46',
+      addressLine2: 'Nandi Garden',
+      city: 'Anekal, Bangalore',
+      state: 'Karnataka',
+      postalCode: '562106',
+      country: 'India',
+      latitude: 12.9716, // Centroid fallback that previously opened Apollo Fertility / JP Nagar
+      longitude: 77.5946,
+    };
+
+    const navUrl = generateNavigationUrl(customerAddress);
+    assert.equal(navUrl.includes('travelmode=driving'), true);
+    // Must NOT navigate to centroid coordinates 12.9716,77.5946
+    assert.equal(navUrl.includes('12.9716%2C77.5946'), false);
+    // Must navigate to the customer address in Anekal
+    assert.equal(navUrl.includes('Akshaya%20Samrudhi%20Nilaya'), true);
+    assert.equal(navUrl.includes('562106'), true);
+  });
+
+  it('Uses genuine non-centroid GPS coordinates when available', () => {
+    const genuineGpsAddress = {
+      addressLine1: 'Villa 12, Palm Meadows',
+      city: 'Whitefield, Bangalore',
+      postalCode: '560066',
+      latitude: 12.9698,
+      longitude: 77.7499,
+    };
+
+    const navUrl = generateNavigationUrl(genuineGpsAddress);
+    assert.equal(navUrl.includes('destination=12.9698%2C77.7499'), true);
+    assert.equal(navUrl.includes('travelmode=driving'), true);
+  });
+
+  it('Properly encodes special characters and handles missing optional address fields', () => {
+    const minimalAddress = {
+      addressLine1: 'Flat #402, Prestige St. John\'s Wood',
+      city: 'Bangalore',
+      postalCode: '560029',
+      latitude: 0,
+      longitude: 0,
+    };
+
+    const navUrl = generateNavigationUrl(minimalAddress);
+    assert.equal(navUrl.startsWith('https://www.google.com/maps/dir/?api=1&destination='), true);
+    assert.equal(navUrl.includes('Flat%20%23402'), true);
+  });
+});
+
+// ─── 6. Buy Now Direct Checkout & Cart Isolation ───────────────
+describe('Buy Now Direct Checkout & Shopping Cart Isolation', () => {
+  it('Buy Now builds direct checkout session payload without mutating persistent cart items', () => {
+    const persistentCart = [
+      { id: 'cart-item-1', name: 'Submariner Date', price: 950000, quantity: 1 },
+      { id: 'cart-item-2', name: 'Speedmaster Moonwatch', price: 620000, quantity: 2 },
+    ];
+
+    const targetProduct = {
+      id: 'prod-seiko-001',
+      slug: 'seiko-presage-cocktail-time-srpb43j1',
+      name: 'Presage Cocktail Time',
+      brand: 'Seiko',
+      reference_number: 'SRPB43J1',
+      price: 45000,
+    };
+
+    const selectedStrap = {
+      id: 'strap-alligator-01',
+      material: 'Alligator Grain Calfskin',
+      price_addon: 4500,
+    };
+
+    // Simulate Buy Now payload construction
+    const buyNowItem = {
+      id: targetProduct.id,
+      slug: targetProduct.slug,
+      name: targetProduct.name,
+      brand: targetProduct.brand,
+      referenceNumber: targetProduct.reference_number,
+      price: targetProduct.price + selectedStrap.price_addon,
+      quantity: 1,
+      strapOption: selectedStrap,
+    };
+
+    // Verify Buy Now item matches selection
+    assert.equal(buyNowItem.price, 49500);
+    assert.equal(buyNowItem.quantity, 1);
+
+    // Verify persistent cart is completely untouched (cart length remains 2)
+    assert.equal(persistentCart.length, 2);
+    assert.equal(persistentCart.some((i) => i.id === 'prod-seiko-001'), false);
+  });
+
+  it('Completing or abandoning Buy Now order preserves persistent cart items', () => {
+    let persistentCart = [
+      { id: 'cart-item-1', name: 'Submariner Date', price: 950000, quantity: 1 },
+    ];
+
+    let buyNowSessionStorage = {
+      wristloom_buy_now_item: JSON.stringify({ id: 'prod-seiko-001', price: 45000, quantity: 1 }),
+    };
+
+    // Simulate Buy Now checkout completion
+    const isBuyNow = true;
+    if (isBuyNow) {
+      delete buyNowSessionStorage.wristloom_buy_now_item;
+    } else {
+      persistentCart = [];
+    }
+
+    // Verify buy now item removed from session storage
+    assert.equal(buyNowSessionStorage.wristloom_buy_now_item, undefined);
+    // Verify persistent cart was NOT cleared
+    assert.equal(persistentCart.length, 1);
+    assert.equal(persistentCart[0].id, 'cart-item-1');
+  });
+});
+

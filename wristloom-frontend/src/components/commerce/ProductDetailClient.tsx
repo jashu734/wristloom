@@ -51,8 +51,29 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
   }
 
   function handleBuyNow() {
-    handleAddToCart();
-    router.push('/cart');
+    const buyNowItem = {
+      id: product.id,
+      slug: product.slug,
+      name: product.modelName || product.name,
+      brand: product.brand,
+      referenceNumber: product.referenceNumber || product.reference_number,
+      price: product.purchaseValue ?? product.price,
+      quantity: 1,
+      imageUrl: product.imageUrl || product.images?.[0] || '/watches/placeholder-watch.svg',
+      strapOption: selectedStrap
+        ? {
+            id: selectedStrap.id,
+            material: selectedStrap.material,
+            price_addon: selectedStrap.price_addon,
+          }
+        : undefined,
+    };
+    try {
+      sessionStorage.setItem('wristloom_buy_now_item', JSON.stringify(buyNowItem));
+    } catch (err) {
+      console.error('Failed to store buy-now item in sessionStorage:', err);
+    }
+    router.push('/checkout?type=buy-now');
   }
 
   function handleToggleWishlist() {

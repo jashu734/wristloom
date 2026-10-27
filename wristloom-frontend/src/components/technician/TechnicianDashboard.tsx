@@ -31,7 +31,12 @@ interface Booking {
   customer: { name: string; phone: string; profileImage?: string };
   address?: {
     formattedAddress: string;
+    addressLine1?: string;
     addressLine2?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    country?: string;
     latitude: number;
     longitude: number;
     fullName: string;
@@ -388,24 +393,40 @@ function BookingCard({ booking, onUpdateStatus }: { booking: Booking; onUpdateSt
     setUpdating(false);
   }
 
-  const hasValidCoords = Boolean(
-    booking.address &&
-    typeof booking.address.latitude === 'number' &&
-    typeof booking.address.longitude === 'number' &&
-    (booking.address.latitude !== 0 || booking.address.longitude !== 0)
+  // 1. Build the complete, accurate customer service address text
+  const addr = booking.address;
+  const addressText = addr?.formattedAddress ||
+    (addr
+      ? [addr.addressLine1, addr.addressLine2, addr.city, addr.state, addr.postalCode, addr.country || 'India']
+          .filter(Boolean)
+          .join(', ')
+      : '');
+
+  // 2. Reject fake city-center centroid fallbacks (e.g. 12.9716, 77.5946)
+  const isCityCentroidFallback = Boolean(
+    addr &&
+    (
+      (Math.abs(addr.latitude - 12.9716) < 0.001 && Math.abs(addr.longitude - 77.5946) < 0.001) ||
+      (Math.abs(addr.latitude - 19.0760) < 0.001 && Math.abs(addr.longitude - 72.8777) < 0.001) ||
+      (Math.abs(addr.latitude - 28.6139) < 0.001 && Math.abs(addr.longitude - 77.2090) < 0.001)
+    )
   );
 
-  const destinationQuery = hasValidCoords
-    ? `${booking.address!.latitude},${booking.address!.longitude}`
-    : booking.address?.formattedAddress ||
-      (booking.address
-        ? [booking.address.formattedAddress, booking.address.addressLine2]
-            .filter(Boolean)
-            .join(', ')
-        : '');
+  const hasGenuineGpsCoords = Boolean(
+    addr &&
+    typeof addr.latitude === 'number' &&
+    typeof addr.longitude === 'number' &&
+    (addr.latitude !== 0 || addr.longitude !== 0) &&
+    !isCityCentroidFallback
+  );
+
+  // Prefer verified device GPS coordinates if genuine; otherwise use the customer's full formatted street address
+  const destinationQuery = hasGenuineGpsCoords
+    ? `${addr!.latitude},${addr!.longitude}`
+    : addressText;
 
   const navUrl = destinationQuery
-    ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destinationQuery)}`
+    ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destinationQuery)}&travelmode=driving`
     : null;
 
   const dateStr = parseISO(booking.scheduledDate);

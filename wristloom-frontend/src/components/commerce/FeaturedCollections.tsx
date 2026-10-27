@@ -49,8 +49,22 @@ export function FeaturedCollections() {
 
   const handleBuyNow = (product: typeof featured, e?: React.MouseEvent) => {
     if (e) e.preventDefault();
-    handleAddToCart(product);
-    router.push('/cart');
+    const buyNowItem = {
+      id: product.id,
+      slug: product.slug,
+      name: product.modelName || product.name,
+      brand: product.brand,
+      referenceNumber: product.referenceNumber || product.reference_number,
+      price: product.purchaseValue ?? product.price,
+      quantity: 1,
+      imageUrl: product.imageUrl || product.images?.[0] || '/watches/placeholder-watch.svg',
+    };
+    try {
+      sessionStorage.setItem('wristloom_buy_now_item', JSON.stringify(buyNowItem));
+    } catch (err) {
+      console.error('Failed to store buy-now item in sessionStorage:', err);
+    }
+    router.push('/checkout?type=buy-now');
   };
 
   return (

@@ -98,35 +98,15 @@ export async function POST(req: NextRequest) {
     let latitude = data.latitude || 0;
     let longitude = data.longitude || 0;
 
-    // If client did not provide GPS coordinates, geocode automatically
+    // If client did not provide GPS coordinates, attempt geocoding
     if (latitude === 0 && longitude === 0) {
       const geoResult = await geocodeQuery(`${data.addressLine1}, ${data.city}, ${data.postalCode}`);
-      if (geoResult) {
+      if (geoResult && geoResult.latitude && geoResult.longitude) {
         latitude = geoResult.latitude;
         longitude = geoResult.longitude;
-      } else {
-        // Fallback to recognized metropolitan horological hubs
-        const cityKey = data.city?.trim().toLowerCase();
-        const cityCoords: Record<string, { lat: number; lng: number }> = {
-          bangalore: { lat: 12.9716, lng: 77.5946 },
-          bengaluru: { lat: 12.9716, lng: 77.5946 },
-          mumbai: { lat: 19.0760, lng: 72.8777 },
-          delhi: { lat: 28.6139, lng: 77.2090 },
-          'new delhi': { lat: 28.6139, lng: 77.2090 },
-          hyderabad: { lat: 17.3850, lng: 78.4867 },
-          chennai: { lat: 13.0827, lng: 80.2707 },
-          kolkata: { lat: 22.5726, lng: 88.3639 },
-          pune: { lat: 18.5204, lng: 73.8567 },
-          ahmedabad: { lat: 23.0225, lng: 72.5714 },
-          jaipur: { lat: 26.9124, lng: 75.7873 },
-          gurgaon: { lat: 28.4595, lng: 77.0266 },
-          noida: { lat: 28.5355, lng: 77.3910 },
-        };
-        if (cityKey && cityCoords[cityKey]) {
-          latitude = cityCoords[cityKey].lat;
-          longitude = cityCoords[cityKey].lng;
-        }
       }
+      // Note: If geocoding does not find a match, do NOT inject fake city-center coordinates.
+      // Keeping 0,0 allows navigation to use the customer's full formatted street address.
     }
 
     const address = await db.address.create({
