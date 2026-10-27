@@ -30,6 +30,8 @@ export function Step3Address() {
     address?.latitude && address?.longitude ? { lat: address.latitude, lng: address.longitude } : null
   );
   const [gpsMessage, setGpsMessage] = React.useState<string | null>(null);
+  const [savedAddresses, setSavedAddresses] = React.useState<any[]>([]);
+  const [selectedSavedId, setSelectedSavedId] = React.useState<string | null>(null);
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -43,6 +45,37 @@ export function Step3Address() {
       postalCode: address?.postalCode ?? '',
     },
   });
+
+  function populateFromSaved(addr: any) {
+    setValue('fullName', addr.fullName || '');
+    setValue('phone', addr.phone || '');
+    setValue('addressLine1', addr.addressLine1 || '');
+    setValue('addressLine2', addr.addressLine2 || '');
+    setValue('city', addr.city || '');
+    setValue('state', addr.state || '');
+    setValue('postalCode', addr.postalCode || '');
+    if (addr.latitude && addr.longitude) {
+      setCoords({ lat: addr.latitude, lng: addr.longitude });
+    }
+  }
+
+  React.useEffect(() => {
+    fetch('/api/addresses')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setSavedAddresses(data);
+          if (address?.savedAddressId) {
+            setSelectedSavedId(address.savedAddressId);
+          } else {
+            const defaultAddr = data.find((a) => a.isDefault) || data[0];
+            setSelectedSavedId(defaultAddr.id);
+            populateFromSaved(defaultAddr);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleUseCurrentLocation = () => {
     if (!('geolocation' in navigator)) {
@@ -125,14 +158,28 @@ export function Step3Address() {
         isDefault: false,
       };
 
-      const res = await fetch('/api/addresses', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      let addressIdToUse = selectedSavedId && selectedSavedId !== 'new' ? selectedSavedId : undefined;
 
-      const saved = res.ok ? await res.json() : null;
-      setAddress({ ...payload, latitude: saved?.latitude ?? payload.latitude, longitude: saved?.longitude ?? payload.longitude }, saved?.id);
+      if (!addressIdToUse) {
+        const res = await fetch('/api/addresses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        const saved = res.ok ? await res.json() : null;
+        addressIdToUse = saved?.id;
+      }
+
+      setAddress(
+        {
+          ...payload,
+          latitude: coords?.lat ?? payload.latitude,
+          longitude: coords?.lng ?? payload.longitude,
+          savedAddressId: addressIdToUse,
+        },
+        addressIdToUse
+      );
       setStep(4);
     } finally {
       setSaving(false);
@@ -149,6 +196,82 @@ export function Step3Address() {
           Where should our technician come? We&apos;ll save this address for future bookings.
         </p>
       </div>
+
+      {/* Saved Addresses Selector */}
+      {savedAddresses.length > 0 && (
+        <div className="mb-6">
+          <label className="block font-mono text-[10px] tracking-widest uppercase text-[#B08D57] mb-2.5">
+            Select Saved Address ({savedAddresses.length})
+          </label>
+          <div className="space-y-2 mb-3">
+            {savedAddresses.map((addr) => {
+              const isSelected = selectedSavedId === addr.id;
+              return (
+                <div
+                  key={addr.id}
+                  onClick={() => {
+                    setSelectedSavedId(addr.id);
+                    populateFromSaved(addr);
+                  }}
+                  className={`p-3.5 rounded-[2px] border cursor-pointer transition-all flex items-start justify-between gap-3 ${
+                    isSelected
+                      ? 'border-[#B08D57] bg-[rgba(176,141,87,0.10)]'
+                      : 'border-[rgba(176,141,87,0.15)] bg-[#1E1A17] hover:border-[rgba(176,141,87,0.30)]'
+                  }`}
+                >
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div
+                      className={`w-4 h-4 rounded-full border mt-0.5 flex items-center justify-center flex-shrink-0 ${
+                        isSelected ? 'border-[#B08D57] bg-[#B08D57]' : 'border-[rgba(176,141,87,0.30)]'
+                      }`}
+                    >
+                      {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-[#14110F]" />}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-[#EDE6D6]">{addr.fullName}</span>
+                        {addr.isDefault && (
+                          <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 bg-[rgba(176,141,87,0.15)] text-[#B08D57] rounded-[1px]">
+                            Default
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-[rgba(237,230,214,0.60)] mt-0.5">
+                        {addr.formattedAddress || `${addr.addressLine1}, ${addr.city}, ${addr.state} ${addr.postalCode}`}
+                      </p>
+                      <p className="text-[11px] font-mono text-[rgba(237,230,214,0.40)] mt-0.5">{addr.phone}</p>
+                    </div>
+                  </div>
+                  {addr.latitude !== 0 && (
+                    <span className="text-[10px] font-mono text-[#B08D57] bg-[rgba(176,141,87,0.10)] px-2 py-0.5 rounded-[1px] flex-shrink-0">
+                      GPS Linked
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedSavedId('new');
+              setValue('fullName', '');
+              setValue('phone', '');
+              setValue('addressLine1', '');
+              setValue('addressLine2', '');
+              setValue('city', '');
+              setValue('state', '');
+              setValue('postalCode', '');
+              setCoords(null);
+            }}
+            className={`text-xs font-mono tracking-wider uppercase transition-colors flex items-center gap-1.5 py-1 ${
+              selectedSavedId === 'new' ? 'text-[#B08D57] font-semibold' : 'text-[rgba(237,230,214,0.50)] hover:text-[#EDE6D6]'
+            }`}
+          >
+            <span>+ Enter a Different / New Address</span>
+          </button>
+        </div>
+      )}
 
       <div className="mb-5 flex items-center justify-between p-3 bg-[#1E1A17] border border-[rgba(176,141,87,0.20)] rounded-[2px]">
         <div className="flex items-center gap-2.5">

@@ -85,17 +85,36 @@ const SERVICE_ALIASES: Record<string, string> = {
   'regular service': 'movement-service',
   repair: 'movement-service',
   overhaul: 'movement-service',
+  'movement servicing': 'movement-service',
+  'movement service': 'movement-service',
+  'movement servicing & overhaul': 'movement-service',
   battery: 'battery-replacement',
   'battery replacement': 'battery-replacement',
+  'battery-replacement': 'battery-replacement',
   strap: 'strap-repair',
   'strap repair': 'strap-repair',
+  'strap-repair': 'strap-repair',
+  'strap / bracelet repair': 'strap-repair',
+  'bracelet repair': 'strap-repair',
   cleaning: 'watch-cleaning',
+  'watch cleaning': 'watch-cleaning',
+  'watch-cleaning': 'watch-cleaning',
   spa: 'watch-cleaning',
+  'atelier exterior spa': 'watch-cleaning',
   water: 'water-resistance',
   'water-resistance': 'water-resistance',
+  'water resistance': 'water-resistance',
+  'water resistance test': 'water-resistance',
+  'water resistance re-sealing': 'water-resistance',
   glass: 'glass-replacement',
+  'glass replacement': 'glass-replacement',
+  'glass-replacement': 'glass-replacement',
   crystal: 'glass-replacement',
+  'crystal replacement': 'glass-replacement',
   restoration: 'full-restoration',
+  'full restoration': 'full-restoration',
+  'full-restoration': 'full-restoration',
+  'full horological restoration': 'full-restoration',
 };
 
 export function findServiceByNameOrId(nameOrId: string): BookableService | undefined {
@@ -103,21 +122,33 @@ export function findServiceByNameOrId(nameOrId: string): BookableService | undef
   const normalized = nameOrId.trim().toLowerCase();
   const resolvedId = SERVICE_ALIASES[normalized] || normalized;
 
-  return (
-    BOOKABLE_SERVICES.find(
-      (s) =>
-        s.id.toLowerCase() === resolvedId ||
-        s.name.toLowerCase() === resolvedId ||
-        s.slug.toLowerCase() === resolvedId ||
-        s.id.toLowerCase() === normalized ||
-        s.name.toLowerCase() === normalized ||
-        s.slug.toLowerCase() === normalized
-    ) ||
-    BOOKABLE_SERVICES.find(
-      (s) =>
-        s.name.toLowerCase().includes(normalized) ||
-        normalized.includes(s.id.toLowerCase())
-    )
+  // 1. Direct or alias match
+  const directMatch = BOOKABLE_SERVICES.find(
+    (s) =>
+      s.id.toLowerCase() === resolvedId ||
+      s.slug.toLowerCase() === resolvedId ||
+      s.name.toLowerCase() === resolvedId ||
+      s.id.toLowerCase() === normalized ||
+      s.slug.toLowerCase() === normalized ||
+      s.name.toLowerCase() === normalized
+  );
+  if (directMatch) return directMatch;
+
+  // 2. Stripped alphanumeric matching (e.g. "water-resistance" vs "water resistance test")
+  const stripped = normalized.replace(/[^a-z0-9]/g, '');
+  const strippedMatch = BOOKABLE_SERVICES.find((s) => {
+    const sId = s.id.replace(/[^a-z0-9]/g, '');
+    const sName = s.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return sId === stripped || sName === stripped || sName.includes(stripped) || stripped.includes(sId);
+  });
+  if (strippedMatch) return strippedMatch;
+
+  // 3. Substring matching
+  return BOOKABLE_SERVICES.find(
+    (s) =>
+      s.name.toLowerCase().includes(normalized) ||
+      normalized.includes(s.id.toLowerCase()) ||
+      normalized.includes(s.slug.toLowerCase())
   );
 }
 

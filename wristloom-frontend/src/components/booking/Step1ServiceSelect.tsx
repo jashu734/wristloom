@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useBookingStore } from '@/store/bookingStore';
 import { Button } from '@/components/primitives/Button';
 import { Battery, Wrench, Droplets, Eye, Shield, Layers, Sparkles } from 'lucide-react';
@@ -23,8 +24,32 @@ const SERVICES = [
 ];
 
 export function Step1ServiceSelect() {
-  const { setService, setStep } = useBookingStore();
-  const [selected, setSelected] = React.useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const serviceParam = searchParams.get('service');
+  const { setService, setStep, serviceType } = useBookingStore();
+
+  const [selected, setSelected] = React.useState<string | null>(() => {
+    if (serviceParam) {
+      const match = SERVICES.find(
+        (s) => s.id === serviceParam || s.label.toLowerCase() === serviceParam.toLowerCase()
+      );
+      if (match) return match.id;
+    }
+    if (serviceType) {
+      const match = SERVICES.find((s) => s.label === serviceType);
+      if (match) return match.id;
+    }
+    return null;
+  });
+
+  React.useEffect(() => {
+    if (serviceParam) {
+      const match = SERVICES.find(
+        (s) => s.id === serviceParam || s.label.toLowerCase() === serviceParam.toLowerCase()
+      );
+      if (match) setSelected(match.id);
+    }
+  }, [serviceParam]);
 
   function handleContinue() {
     const svc = SERVICES.find((s) => s.id === selected);

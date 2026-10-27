@@ -90,6 +90,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export async function generateStaticParams() {
+  try {
+    const dbProducts = await db.product.findMany({
+      where: { isActive: true },
+      select: { slug: true },
+    });
+    if (dbProducts.length > 0) {
+      return dbProducts.map((p) => ({ slug: p.slug }));
+    }
+  } catch (err) {
+    console.error('generateStaticParams error:', err);
+  }
   return MOCK_PRODUCTS.map((p) => ({ slug: p.slug }));
 }
 

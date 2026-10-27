@@ -21,6 +21,9 @@ cookies*.txt
 *.pem
 *.key
 scratch/
+database-backup/
+*.dump
+*.sql
 
 # Debug logs
 npm-debug.log*

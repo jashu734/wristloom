@@ -150,9 +150,11 @@ export function ShopGrid({ initialProducts = [] }: { initialProducts?: any[] }) 
         if (!matchesName && !matchesModel && !matchesRef && !matchesBrand) return false;
       }
 
-      // 2. Brand filter (ONLY the 12 specified brands)
-      if (filters.brands.length > 0 && !filters.brands.includes(p.brand)) {
-        return false;
+      // 2. Brand filter (Case-insensitive matching)
+      if (filters.brands.length > 0) {
+        const pBrand = (p.brand || '').toLowerCase().trim();
+        const matchesBrand = filters.brands.some((b) => b.toLowerCase().trim() === pBrand);
+        if (!matchesBrand) return false;
       }
 
       // 3. Movement Type filter
@@ -190,10 +192,15 @@ export function ShopGrid({ initialProducts = [] }: { initialProducts?: any[] }) 
     filters.caseSizes.length;
 
   function toggleBrand(brand: string) {
-    setFilters((f) => ({
-      ...f,
-      brands: f.brands.includes(brand) ? f.brands.filter((b) => b !== brand) : [...f.brands, brand],
-    }));
+    setFilters((f) => {
+      const exists = f.brands.some((b) => b.toLowerCase().trim() === brand.toLowerCase().trim());
+      return {
+        ...f,
+        brands: exists
+          ? f.brands.filter((b) => b.toLowerCase().trim() !== brand.toLowerCase().trim())
+          : [...f.brands, brand],
+      };
+    });
   }
 
   function toggleMovement(m: string) {
@@ -298,7 +305,7 @@ export function ShopGrid({ initialProducts = [] }: { initialProducts?: any[] }) 
                 <FilterCheckbox
                   key={brand}
                   label={brand}
-                  checked={filters.brands.includes(brand)}
+                  checked={filters.brands.some((b) => b.toLowerCase().trim() === brand.toLowerCase().trim())}
                   onChange={() => toggleBrand(brand)}
                 />
               ))}

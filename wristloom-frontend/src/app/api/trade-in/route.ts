@@ -37,6 +37,31 @@ const SCOPE_MULTIPLIERS: Record<string, number> = {
   'Watch Only': 0.95,
 };
 
+export async function GET(req: NextRequest) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const isAdmin = session.user.role === 'ADMIN';
+    const where = isAdmin ? {} : { customerId: session.user.id };
+
+    const tradeIns = await db.tradeInRequest.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        customer: { select: { id: true, name: true, email: true, phone: true } },
+      },
+    });
+
+    return NextResponse.json({ tradeIns, total: tradeIns.length });
+  } catch (err: any) {
+    console.error('Error fetching trade-in requests:', err);
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await auth();

@@ -54,7 +54,7 @@ const nextConfig: NextConfig = {
   },
 
   // Allow dev access from local network (e.g. phone/tablet testing)
-  allowedDevOrigins: ['192.168.56.1', '192.168.1.*', '10.0.0.*'],
+  allowedDevOrigins: ['192.168.56.1', '192.168.1.*', '10.0.0.*', '172.27.240.1', '172.*'],
 };
 
 export default nextConfig;
