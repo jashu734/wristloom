@@ -172,6 +172,7 @@ export function HorologicalLoupe({
         <img
           src={imageSrc}
           alt={alt}
+          fetchPriority="high"
           className="w-full h-full object-contain p-4 transition-transform duration-300"
         />
 

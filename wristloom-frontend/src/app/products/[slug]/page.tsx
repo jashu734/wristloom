@@ -10,6 +10,8 @@ interface Props {
   params: Promise<{ slug: string }>;
 }
 
+export const revalidate = 60;
+
 async function findProduct(slug: string): Promise<Product | null> {
   const normalizedSlug = slug.trim().toLowerCase();
 

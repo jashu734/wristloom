@@ -9,7 +9,7 @@ const fraunces = Fraunces({
   subsets: ['latin'],
   variable: '--font-fraunces',
   display: 'swap',
-  axes: ['SOFT', 'WONK', 'opsz'],
+  weight: ['400', '600', '700'],
 });
 
 const inter = Inter({
@@ -22,7 +22,7 @@ const ibmPlexMono = IBM_Plex_Mono({
   subsets: ['latin'],
   variable: '--font-ibm-plex-mono',
   display: 'swap',
-  weight: ['400', '500', '600'],
+  weight: ['400', '500'],
 });
 
 // ─── Metadata ────────────────────────────────────────────────

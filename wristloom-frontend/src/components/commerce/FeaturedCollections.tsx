@@ -123,8 +123,7 @@ export function FeaturedCollections() {
                 src={featured.images[0]}
                 alt={`${featured.brand} ${featured.name}`}
                 fill
-                priority
-                sizes="(max-width: 1024px) 100vw, 60vw"
+                sizes="(max-width: 1024px) 100vw, 50vw"
                 className="object-contain p-6 transition-transform duration-700 group-hover:scale-[1.05]"
               />
               <div className="absolute top-4 right-4 z-10">

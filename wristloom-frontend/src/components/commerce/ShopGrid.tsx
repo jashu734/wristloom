@@ -23,7 +23,13 @@ interface Filters {
   sort: 'newest' | 'price-asc' | 'price-desc' | 'name-asc';
 }
 
-export function ShopGrid({ initialProducts = [] }: { initialProducts?: any[] }) {
+export function ShopGrid({
+  initialProducts = [],
+  initialBrands = [],
+}: {
+  initialProducts?: any[];
+  initialBrands?: string[];
+}) {
   const searchParams = useSearchParams();
   const { isInWishlist, toggleItem } = useWishlistStore();
   const addItem = useCartStore((s) => s.addItem);
@@ -42,7 +48,9 @@ export function ShopGrid({ initialProducts = [] }: { initialProducts?: any[] }) 
     sort: 'newest',
   });
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
-  const [dynamicBrands, setDynamicBrands] = React.useState<string[]>([...WATCH_BRANDS]);
+  const [dynamicBrands, setDynamicBrands] = React.useState<string[]>(
+    initialBrands.length > 0 ? initialBrands : [...WATCH_BRANDS]
+  );
 
   // Sync brand filter if query parameter changes
   React.useEffect(() => {
@@ -55,8 +63,9 @@ export function ShopGrid({ initialProducts = [] }: { initialProducts?: any[] }) 
     }
   }, [searchParams]);
 
-  // Load active brands dynamically from API
+  // Load active brands dynamically from API if not preloaded
   React.useEffect(() => {
+    if (initialBrands.length > 0) return;
     fetch('/api/brands')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
@@ -66,7 +75,7 @@ export function ShopGrid({ initialProducts = [] }: { initialProducts?: any[] }) 
         }
       })
       .catch(() => {});
-  }, []);
+  }, [initialBrands.length]);
 
   React.useEffect(() => {
     if (initialProducts.length > 0) return;

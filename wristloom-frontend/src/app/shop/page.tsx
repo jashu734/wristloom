@@ -14,11 +14,20 @@ export const revalidate = 60;
 
 export default async function ShopPage() {
   let initialProducts: any[] = [];
+  let initialBrands: string[] = [];
   try {
-    const rawProducts = await db.product.findMany({
-      where: { isActive: true },
-      orderBy: { createdAt: 'desc' },
-    });
+    const [rawProducts, rawBrands] = await Promise.all([
+      db.product.findMany({
+        where: { isActive: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      db.brand.findMany({
+        where: { isActive: true },
+        select: { name: true },
+        orderBy: { name: 'asc' },
+      }),
+    ]);
+    initialBrands = rawBrands.map((b) => b.name);
     initialProducts = rawProducts.map((p) => {
       const purchaseVal = p.purchaseValue ?? p.price;
       const primaryImage = p.imageUrl || (p.images && p.images.length > 0 ? p.images[0] : '/watches/placeholder-watch.svg');
@@ -54,7 +63,7 @@ export default async function ShopPage() {
           </div>
         }
       >
-        <ShopGrid initialProducts={initialProducts} />
+        <ShopGrid initialProducts={initialProducts} initialBrands={initialBrands} />
       </Suspense>
     </SiteWrapper>
   );

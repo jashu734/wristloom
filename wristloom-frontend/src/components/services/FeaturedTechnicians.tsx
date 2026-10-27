@@ -1,5 +1,6 @@
 import * as React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { MOCK_TECHNICIANS } from '@/lib/mock-data';
 import { Star, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/primitives/Button';
@@ -38,11 +39,13 @@ export function FeaturedTechnicians() {
               className="group bg-[#14110F] border border-[rgba(176,141,87,0.10)] hover:border-[rgba(176,141,87,0.25)] rounded-[2px] overflow-hidden transition-all duration-300"
             >
               {/* Portrait */}
-              <div className="aspect-[3/2] overflow-hidden">
-                <img
+              <div className="aspect-[3/2] overflow-hidden relative">
+                <Image
                   src={tech.portrait_url}
                   alt={tech.name}
-                  className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.04]"
+                  fill
+                  sizes="(max-width: 640px) 100vw, 33vw"
+                  className="object-cover object-top transition-transform duration-500 group-hover:scale-[1.04]"
                   loading="lazy"
                 />
               </div>

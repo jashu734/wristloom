@@ -12,11 +12,12 @@ interface BrandSummary {
   productCount: number;
 }
 
-export function BrandShowcaseStrip() {
-  const [brands, setBrands] = React.useState<BrandSummary[]>([]);
-  const [loading, setLoading] = React.useState(true);
+export function BrandShowcaseStrip({ initialBrands = [] }: { initialBrands?: BrandSummary[] }) {
+  const [brands, setBrands] = React.useState<BrandSummary[]>(initialBrands);
+  const [loading, setLoading] = React.useState(initialBrands.length === 0);
 
   React.useEffect(() => {
+    if (initialBrands.length > 0) return;
     fetch('/api/brands')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -26,7 +27,7 @@ export function BrandShowcaseStrip() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [initialBrands.length]);
 
   if (!loading && brands.length === 0) return null;
 
@@ -67,6 +68,9 @@ export function BrandShowcaseStrip() {
                   <img
                     src={brand.logo}
                     alt={brand.name}
+                    width={32}
+                    height={32}
+                    loading="lazy"
                     className="w-full h-full object-contain"
                   />
                 ) : (

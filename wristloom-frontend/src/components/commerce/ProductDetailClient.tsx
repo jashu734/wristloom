@@ -134,7 +134,7 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
                     aria-label={`View image ${i + 1}`}
                     aria-pressed={selectedImage === i}
                   >
-                    <img src={img} alt="" className="w-full h-full object-contain p-1 bg-[#14110F]" />
+                    <img src={img} alt="" width={64} height={64} loading="lazy" className="w-full h-full object-contain p-1 bg-[#14110F]" />
                   </button>
                 ))}
               </div>

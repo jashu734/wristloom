@@ -53,7 +53,11 @@ export function HeaderAuth() {
   }
 
   if (status === 'loading') {
-    return <Loader2 className="w-4 h-4 text-[rgba(237,230,214,0.30)] animate-spin" />;
+    return (
+      <div className="h-7 w-24 flex items-center justify-end" aria-hidden="true">
+        <span className="w-16 h-3 bg-[rgba(237,230,214,0.08)] rounded-[2px] animate-pulse" />
+      </div>
+    );
   }
 
   if (!session?.user) {
