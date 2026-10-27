@@ -31,11 +31,13 @@ const bookingSchema = z.object({
 export async function GET(req: NextRequest) {
   try {
     const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ bookings: [], total: 0 });
-    }
-
     const { searchParams } = new URL(req.url);
+    if (!session?.user?.id) {
+      if (searchParams.has('page') || searchParams.has('limit')) {
+        return NextResponse.json({ bookings: [], total: 0 });
+      }
+      return NextResponse.json([]);
+    }
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
     const skip = (page - 1) * limit;
